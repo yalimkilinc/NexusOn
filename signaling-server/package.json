@@ -1,0 +1,13 @@
+{
+  "name": "nexusgo-signaling-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NexusGo icin ucretsiz, self-host edilebilir WebSocket sinyal (rendezvous) sunucusu. Aylik/kullanim bazli hicbir ucreti yoktur.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.21.1"
+  }
+}

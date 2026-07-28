@@ -1,0 +1,15 @@
+# Node
+node_modules/
+app/dist/
+app/build/
+signaling-server/dist/
+
+# Editörler / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code oturum/tamamlama dosyaları
+.claude/completions/
+.claude/sessions/

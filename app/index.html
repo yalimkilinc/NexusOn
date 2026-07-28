@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src ws: wss: http: https:;" />
+<title>NexusGo</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="brand">Nexus<span>Go</span></div>
+      <div id="roleBadge" class="role-badge">Müşteri</div>
+    </div>
+    <div id="statusBadge" class="status status-disconnected">Bağlı değil</div>
+  </header>
+
+  <section id="setupPanel" class="panel setup-layout">
+    <div class="setup-card">
+      <div id="roleChoice" class="role-choice">
+        <button id="roleHostBtn" class="role-btn active" data-role="host">
+          Destek Almak İstiyorum<span>Bu bilgisayarı paylaş</span>
+        </button>
+        <button id="roleViewerBtn" class="role-btn" data-role="viewer">
+          Destek Vermek İstiyorum<span>Uzak bilgisayara bağlan</span>
+        </button>
+      </div>
+
+      <!-- MÜŞTERİ (HOST) akışı: tek buton, teknik detay yok -->
+      <div id="hostSetup" class="role-setup">
+        <p class="hint">Butona basın, size verilecek kodu destek personeline söyleyin.</p>
+        <button id="hostStartBtn" class="primary-btn">Destek Kodu Oluştur ve Paylaşımı Başlat</button>
+        <div id="hostCodeDisplay" class="code-display hidden">
+          <span class="code-display-label">Kodunuz</span>
+          <span id="hostCodeValue" class="code-display-value"></span>
+          <button id="copyCodeBtn" class="secondary-btn small">Kodu Kopyala</button>
+        </div>
+      </div>
+
+      <!-- DESTEK EKİBİ (VIEWER) akışı: sadece kod girişi, sunucu adresi sabit -->
+      <div id="viewerSetup" class="role-setup hidden">
+        <div class="field-row">
+          <input id="roomCodeInput" maxlength="8" placeholder="Müşteriden Alınan Kod" autocomplete="off" />
+        </div>
+        <button id="viewerConnectBtn" class="primary-btn">Bağlan</button>
+      </div>
+    </div>
+
+    <!-- Musteri (host) ekraninda gosterilen: kayan duyuru seridi + tiklanabilir iletisim karti -->
+    <aside id="newsTicker" class="news-panel hidden">
+      <div class="ticker-viewport">
+        <div id="tickerTrack" class="ticker-track"></div>
+      </div>
+      <div class="contact-card">
+        <div class="contact-card-title">Online Destek</div>
+        <button id="contactWhatsapp" class="contact-row" type="button">
+          <svg class="contact-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.06-1.33A10 10 0 1 0 12 2zm0 18.2a8.17 8.17 0 0 1-4.17-1.14l-.3-.18-3 .78.8-2.92-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.52-6.13c-.25-.12-1.45-.72-1.68-.8s-.39-.12-.56.12-.64.8-.79.97-.29.18-.54.06a6.7 6.7 0 0 1-1.97-1.22 7.4 7.4 0 0 1-1.36-1.7c-.14-.25 0-.38.11-.5.11-.11.25-.29.37-.43a1.6 1.6 0 0 0 .25-.42.46.46 0 0 0 0-.44c-.06-.12-.56-1.35-.77-1.85s-.4-.42-.56-.43h-.48a.92.92 0 0 0-.67.31 2.8 2.8 0 0 0-.87 2.08 4.9 4.9 0 0 0 1.02 2.6 11.2 11.2 0 0 0 4.29 3.79c.6.26 1.06.41 1.43.53a3.44 3.44 0 0 0 1.58.1 2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .15-1.2c-.06-.1-.23-.17-.48-.29z"/></svg>
+          <span id="contactPhoneText" class="contact-text"></span>
+        </button>
+        <button id="contactWebsite" class="contact-row" type="button">
+          <svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+          <span id="contactWebsiteText" class="contact-text"></span>
+        </button>
+        <button id="contactEmail" class="contact-row" type="button">
+          <svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
+          <span id="contactEmailText" class="contact-text"></span>
+        </button>
+      </div>
+    </aside>
+  </section>
+
+  <section id="sessionPanel" class="panel session-panel hidden">
+    <div class="session-main">
+      <div id="videoWrap" class="video-wrap" tabindex="0">
+        <video id="remoteVideo" autoplay playsinline></video>
+        <div id="hostPlaceholder" class="host-placeholder hidden">
+          <p>Ekranınız karşı tarafla paylaşılıyor.</p>
+          <label class="control-toggle">
+            <input type="checkbox" id="allowControlCheckbox" />
+            Uzaktan kontrole izin ver (fare / klavye)
+          </label>
+        </div>
+        <div id="controlHint" class="control-hint hidden">Kontrol için ekrana tıklayın</div>
+      </div>
+      <div class="session-actions">
+        <button id="disconnectBtn" class="danger-btn">Bağlantıyı Kes</button>
+        <button id="toggleLogBtn" class="link-btn hidden">Teknik Günlüğü Göster</button>
+      </div>
+    </div>
+
+    <aside id="filePanel" class="file-panel">
+      <div class="file-panel-header">
+        <h3>Dosya Aktarımı</h3>
+        <button id="sendFileBtn" class="primary-btn small">Dosya Gönder</button>
+      </div>
+      <div id="transferList" class="transfer-list">
+        <p class="empty-hint">Henüz dosya aktarımı yok.<br />Dosyayı buraya sürükleyip bırakabilirsiniz.</p>
+      </div>
+    </aside>
+  </section>
+
+  <footer id="logPanel" class="log-panel hidden">
+    <div class="log-header">Bağlantı Günlüğü</div>
+    <div id="logBox" class="log-box"></div>
+  </footer>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

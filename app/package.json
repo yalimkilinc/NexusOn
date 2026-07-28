@@ -1,0 +1,27 @@
+{
+  "name": "nexusgo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NexusGo - musteri bilgisayarlarina uzaktan destek uygulamasi (Windows).",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6"
+  },
+  "build": {
+    "appId": "com.nexusgo.app",
+    "productName": "NexusGo",
+    "win": {
+      "target": ["nsis"],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "files": ["**/*", "!node_modules/@nut-tree-fork/**/build/**/*.{o,obj}"]
+  }
+}
