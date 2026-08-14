@@ -2,107 +2,340 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src ws: wss: http: https:;" />
-<title>NexusGo</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; media-src 'self' blob:; connect-src ws: wss: http: https:;" />
+<title>NexusOn</title>
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="topbar-left">
-      <div class="brand">Nexus<span>Go</span></div>
+      <img class="brand-logo" src="assets/nexuson-logo.png" alt="NexusOn" />
+      <button id="appVersionText" class="app-version-text" type="button" title="Hakkında"></button>
       <div id="roleBadge" class="role-badge">Müşteri</div>
     </div>
-    <div id="statusBadge" class="status status-disconnected">Bağlı değil</div>
+    <div class="topbar-right">
+      <div class="file-menu-wrap">
+        <button id="fileMenuBtn" class="file-menu-btn hidden" type="button">Dosya Aktarımı</button>
+        <aside id="filePanel" class="file-panel-dropdown hidden">
+          <div class="file-panel-header">
+            <h3>Dosya Aktarımı</h3>
+            <button id="sendFileBtn" class="primary-btn small">Dosya Gönder</button>
+          </div>
+          <div id="transferList" class="transfer-list">
+            <p class="empty-hint">Henüz dosya aktarımı yok.<br />Dosyayı buraya sürükleyip bırakabilirsiniz.</p>
+          </div>
+        </aside>
+      </div>
+      <button id="toggleLogBtn" class="link-btn hidden">Teknik Günlüğü Göster</button>
+      <select id="screenSelect" class="screen-select hidden" title="Ekran seç"></select>
+      <button id="disconnectBtn" class="danger-btn hidden">Bağlantıyı Kes</button>
+      <div id="statusBadge" class="status status-disconnected">Bağlı değil</div>
+      <div id="windowControls" class="window-controls">
+        <button id="windowMinimizeBtn" class="window-control-btn" type="button" aria-label="Küçült" title="Küçült">
+          <svg viewBox="0 0 10 1" width="10" height="1"><rect width="10" height="1" fill="currentColor"/></svg>
+        </button>
+        <button id="windowMaximizeBtn" class="window-control-btn" type="button" aria-label="Büyüt" title="Büyüt">
+          <svg viewBox="0 0 10 10" width="10" height="10"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor"/></svg>
+        </button>
+        <button id="windowCloseBtn" class="window-control-btn window-control-close" type="button" aria-label="Kapat" title="Kapat">
+          <svg viewBox="0 0 10 10" width="10" height="10"><path d="M0.5,0.5 L9.5,9.5 M9.5,0.5 L0.5,9.5" stroke="currentColor" stroke-width="1.1"/></svg>
+        </button>
+      </div>
+    </div>
   </header>
 
+  <div id="updateBanner" class="update-banner hidden">
+    <span id="updateBannerText">Yeni bir NexusOn sürümü mevcut (<span id="updateVersionText"></span>).</span>
+    <button id="updateNowBtn" class="update-now-btn" type="button">Şimdi Güncelle</button>
+    <button id="updateBannerCloseBtn" class="update-banner-close" type="button" aria-label="Kapat">×</button>
+  </div>
+
+  <div class="main-body">
+  <div id="sessionTabsRail" class="session-tabs-rail hidden">
+    <button id="sessionTabsToggleBtn" class="session-tabs-toggle" type="button" title="Sekmeleri gizle">‹</button>
+    <div id="sessionTabs" class="session-tabs"></div>
+  </div>
+
   <section id="setupPanel" class="panel setup-layout">
-    <div class="setup-card">
-      <div id="roleChoice" class="role-choice">
-        <button id="roleHostBtn" class="role-btn active" data-role="host">
-          Destek Almak İstiyorum<span>Bu bilgisayarı paylaş</span>
-        </button>
-        <button id="roleViewerBtn" class="role-btn" data-role="viewer">
-          Destek Vermek İstiyorum<span>Uzak bilgisayara bağlan</span>
-        </button>
-      </div>
+    <div class="left-col">
+      <div id="setupCard" class="setup-card">
+        <div id="roleChoice" class="role-choice">
+          <button id="roleHostBtn" class="role-btn active" data-role="host">
+            Destek Almak İçin<span>Bu bilgisayarı paylaş</span>
+          </button>
+          <button id="roleViewerBtn" class="role-btn" data-role="viewer">
+            Destek Vermek İçin<span>Uzak bilgisayara bağlan</span>
+          </button>
+        </div>
 
-      <!-- MÜŞTERİ (HOST) akışı: tek buton, teknik detay yok -->
-      <div id="hostSetup" class="role-setup">
-        <p class="hint">Butona basın, size verilecek kodu destek personeline söyleyin.</p>
-        <button id="hostStartBtn" class="primary-btn">Destek Kodu Oluştur ve Paylaşımı Başlat</button>
-        <div id="hostCodeDisplay" class="code-display hidden">
-          <span class="code-display-label">Kodunuz</span>
-          <span id="hostCodeValue" class="code-display-value"></span>
-          <button id="copyCodeBtn" class="secondary-btn small">Kodu Kopyala</button>
+        <!-- MÜŞTERİ (HOST) akışı: baglanti "Bağlantı Talebi İlet" karti
+             (leftBottomCard) uzerinden baslar; burasi sadece uretilen kodu/
+             hata durumunu gosterir. -->
+        <div id="hostSetup" class="role-setup">
+          <div id="hostCodeDisplay" class="code-display hidden">
+            <span class="code-display-label">Kodunuz</span>
+            <span id="hostCodeValue" class="code-display-value"></span>
+            <button id="copyCodeBtn" class="secondary-btn small">Kodu Kopyala</button>
+          </div>
+          <p id="hostErrorText" class="error-text hidden"></p>
+        </div>
+
+        <!-- DESTEK EKİBİ (VIEWER) - once personel girisi -->
+        <div id="agentLogin" class="role-setup hidden">
+          <p class="hint">Devam etmek için personel hesabınızla giriş yapın.</p>
+          <div class="field-row">
+            <select id="agentUsernameInput" autocomplete="username">
+              <option value="" disabled selected>Kullanıcınızı seçin</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <input id="agentPasswordInput" type="password" placeholder="Şifre" autocomplete="current-password" />
+          </div>
+          <button id="agentLoginBtn" class="primary-btn">Giriş Yap</button>
+          <p id="agentLoginError" class="error-text hidden"></p>
+        </div>
+
+        <!-- DESTEK EKİBİ (VIEWER) - once musteri (cari) secimi -->
+        <div id="customerSelect" class="role-setup hidden">
+          <p class="hint">
+            Giriş yapan: <span id="agentUsernameLabel2"></span> ·
+            <button id="changePasswordBtn2" class="link-btn" type="button" style="margin-top:0;">Şifre Değiştir</button> ·
+            <button id="agentLogoutBtn2" class="link-btn" type="button" style="margin-top:0;">Çıkış Yap</button>
+          </p>
+          <p class="hint">Bağlanmadan önce müşteriyi seçin.</p>
+          <div class="field-row">
+            <input id="customerSearchInput" placeholder="Müşteri kodu veya adı ile arayın..." autocomplete="off" />
+          </div>
+          <div id="customerSearchResults" class="customer-result-list"></div>
+        </div>
+
+        <!-- DESTEK EKİBİ (VIEWER) akışı: sadece kod girişi, sunucu adresi sabit -->
+        <div id="viewerSetup" class="role-setup hidden">
+          <p class="hint">
+            Giriş yapan: <span id="agentUsernameLabel"></span> ·
+            <button id="changePasswordBtn" class="link-btn" type="button" style="margin-top:0;">Şifre Değiştir</button> ·
+            <button id="agentLogoutBtn" class="link-btn" type="button" style="margin-top:0;">Çıkış Yap</button>
+          </p>
+          <div class="code-display" style="margin-top:0; margin-bottom:16px;">
+            <span class="code-display-label">Seçili Müşteri</span>
+            <span id="selectedCustomerLabel" class="code-display-value" style="font-size:15px; letter-spacing:0;"></span>
+            <button id="changeCustomerBtn" class="secondary-btn small">Değiştir</button>
+          </div>
+          <div class="field-row">
+            <input id="roomCodeInput" maxlength="8" placeholder="Müşteriden Alınan Kod" autocomplete="off" />
+          </div>
+          <button id="viewerConnectBtn" class="primary-btn">Bağlan</button>
         </div>
       </div>
 
-      <!-- DESTEK EKİBİ (VIEWER) akışı: sadece kod girişi, sunucu adresi sabit -->
-      <div id="viewerSetup" class="role-setup hidden">
-        <div class="field-row">
-          <input id="roomCodeInput" maxlength="8" placeholder="Müşteriden Alınan Kod" autocomplete="off" />
-        </div>
-        <button id="viewerConnectBtn" class="primary-btn">Bağlan</button>
+      <!-- Musteri firma adini girer, arka planda destek ekibine Telegram
+           bildirimi gider (musteri ekraninda Telegram'la ilgili hicbir sey
+           gorunmez) ve ayni zamanda normal paylasim/kod akisi baslar.
+           setupCard ile AYNI cerceve icinde (bkz. .left-col). -->
+      <div id="leftBottomCard" class="left-bottom-card hidden">
+      <div class="left-bottom-card-title">Bağlantı Talebi İlet</div>
+      <p class="hint" style="margin-top:8px; margin-bottom:16px;">Firma adınızı yazın, destek ekibimiz size ulaşsın.</p>
+      <div class="field-row">
+        <label>Ne için destek istiyorsunuz? (opsiyonel)</label>
+        <select id="hostRequestCategory">
+          <option value="">Seçiniz (opsiyonel)</option>
+          <option value="Yazıcı sorunu">Yazıcı sorunu</option>
+          <option value="İnternet/ağ bağlantı sorunu">İnternet/ağ bağlantı sorunu</option>
+          <option value="Program açılmıyor/çöküyor">Program açılmıyor/çöküyor</option>
+          <option value="Nebim V3 hatası">Nebim V3 hatası</option>
+          <option value="Yavaşlık/donma">Yavaşlık/donma</option>
+          <option value="diger">Diğer (yazınız)</option>
+        </select>
+        <textarea id="hostRequestNote" rows="2" placeholder="Sorununuzu kısaca açıklayın" class="hidden"></textarea>
+      </div>
+      <button id="connectionRequestBtn" class="primary-btn" type="button">Bağlantı Talebi İlet</button>
       </div>
     </div>
 
-    <!-- Musteri (host) ekraninda gosterilen: kayan duyuru seridi + tiklanabilir iletisim karti -->
-    <aside id="newsTicker" class="news-panel hidden">
+    <!-- Sadece Musteri (host) ekraninda: kayan duyuru seridi + gorsel slider + iletisim satiri -->
+    <aside id="newsTicker" class="right-col hidden">
       <div class="ticker-viewport">
         <div id="tickerTrack" class="ticker-track"></div>
       </div>
-      <div class="contact-card">
-        <div class="contact-card-title">Online Destek</div>
-        <button id="contactWhatsapp" class="contact-row" type="button">
-          <svg class="contact-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.06-1.33A10 10 0 1 0 12 2zm0 18.2a8.17 8.17 0 0 1-4.17-1.14l-.3-.18-3 .78.8-2.92-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.52-6.13c-.25-.12-1.45-.72-1.68-.8s-.39-.12-.56.12-.64.8-.79.97-.29.18-.54.06a6.7 6.7 0 0 1-1.97-1.22 7.4 7.4 0 0 1-1.36-1.7c-.14-.25 0-.38.11-.5.11-.11.25-.29.37-.43a1.6 1.6 0 0 0 .25-.42.46.46 0 0 0 0-.44c-.06-.12-.56-1.35-.77-1.85s-.4-.42-.56-.43h-.48a.92.92 0 0 0-.67.31 2.8 2.8 0 0 0-.87 2.08 4.9 4.9 0 0 0 1.02 2.6 11.2 11.2 0 0 0 4.29 3.79c.6.26 1.06.41 1.43.53a3.44 3.44 0 0 0 1.58.1 2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .15-1.2c-.06-.1-.23-.17-.48-.29z"/></svg>
-          <span id="contactPhoneText" class="contact-text"></span>
-        </button>
-        <button id="contactWebsite" class="contact-row" type="button">
-          <svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
-          <span id="contactWebsiteText" class="contact-text"></span>
-        </button>
-        <button id="contactEmail" class="contact-row" type="button">
-          <svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
-          <span id="contactEmailText" class="contact-text"></span>
-        </button>
+      <div id="heroSlider" class="hero-slider">
+        <div id="heroSlidesContainer" class="hero-slides-container"></div>
+        <button id="heroPrevBtn" class="hero-arrow left" type="button" aria-label="Önceki">‹</button>
+        <button id="heroNextBtn" class="hero-arrow right" type="button" aria-label="Sonraki">›</button>
+        <div id="heroDots" class="hero-dots"></div>
       </div>
     </aside>
+
+    <!-- Alt satir: sol karti ve saga (duyuru+slider) hizalayan ust satirin
+         ALTINDA, tam genislikte ayri bir satir. Su an iletisim bilgileri
+         (telefon/website/e-posta) icin kullaniliyor. -->
+    <div id="contactCard" class="contact-card">
+      <button id="contactWhatsapp" class="contact-row" type="button">
+        <svg class="contact-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.06-1.33A10 10 0 1 0 12 2zm0 18.2a8.17 8.17 0 0 1-4.17-1.14l-.3-.18-3 .78.8-2.92-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.52-6.13c-.25-.12-1.45-.72-1.68-.8s-.39-.12-.56.12-.64.8-.79.97-.29.18-.54.06a6.7 6.7 0 0 1-1.97-1.22 7.4 7.4 0 0 1-1.36-1.7c-.14-.25 0-.38.11-.5.11-.11.25-.29.37-.43a1.6 1.6 0 0 0 .25-.42.46.46 0 0 0 0-.44c-.06-.12-.56-1.35-.77-1.85s-.4-.42-.56-.43h-.48a.92.92 0 0 0-.67.31 2.8 2.8 0 0 0-.87 2.08 4.9 4.9 0 0 0 1.02 2.6 11.2 11.2 0 0 0 4.29 3.79c.6.26 1.06.41 1.43.53a3.44 3.44 0 0 0 1.58.1 2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .15-1.2c-.06-.1-.23-.17-.48-.29z"/></svg>
+        <span id="contactPhoneText" class="contact-text"></span>
+      </button>
+      <button id="contactWebsite" class="contact-row" type="button">
+        <svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        <span id="contactWebsiteText" class="contact-text"></span>
+      </button>
+      <button id="contactEmail" class="contact-row" type="button">
+        <svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
+        <span id="contactEmailText" class="contact-text"></span>
+      </button>
+    </div>
   </section>
 
   <section id="sessionPanel" class="panel session-panel hidden">
-    <div class="session-main">
       <div id="videoWrap" class="video-wrap" tabindex="0">
         <video id="remoteVideo" autoplay playsinline></video>
         <div id="hostPlaceholder" class="host-placeholder hidden">
           <p>Ekranınız karşı tarafla paylaşılıyor.</p>
-          <label class="control-toggle">
-            <input type="checkbox" id="allowControlCheckbox" />
-            Uzaktan kontrole izin ver (fare / klavye)
-          </label>
+          <input type="checkbox" id="allowControlCheckbox" checked class="hidden" />
         </div>
         <div id="controlHint" class="control-hint hidden">Kontrol için ekrana tıklayın</div>
+        <div id="remoteCursorDot" class="remote-cursor-dot hidden">
+          <svg viewBox="0 0 24 24"><path d="M4 2l14 8.5-6 1.5 3 6.5-3 1.5-3-6.5-5 4z"/></svg>
+        </div>
       </div>
-      <div class="session-actions">
-        <button id="disconnectBtn" class="danger-btn">Bağlantıyı Kes</button>
-        <button id="toggleLogBtn" class="link-btn hidden">Teknik Günlüğü Göster</button>
-      </div>
-    </div>
-
-    <aside id="filePanel" class="file-panel">
-      <div class="file-panel-header">
-        <h3>Dosya Aktarımı</h3>
-        <button id="sendFileBtn" class="primary-btn small">Dosya Gönder</button>
-      </div>
-      <div id="transferList" class="transfer-list">
-        <p class="empty-hint">Henüz dosya aktarımı yok.<br />Dosyayı buraya sürükleyip bırakabilirsiniz.</p>
-      </div>
-    </aside>
   </section>
+  </div>
 
   <footer id="logPanel" class="log-panel hidden">
     <div class="log-header">Bağlantı Günlüğü</div>
     <div id="logBox" class="log-box"></div>
   </footer>
+
+  <!-- Destek ekibi bir gorusmeyi bitirdiginde doldurdugu kapanis formu -->
+  <div id="closingFormOverlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3>Görüşmeyi Kapat</h3>
+      <div class="field-row">
+        <label>Tür</label>
+        <select id="closingCategory">
+          <option value="hata">Hata</option>
+          <option value="sorun">Sorun</option>
+          <option value="istek">İstek</option>
+          <option value="gelistirme">Geliştirme Talebi</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <label>Durum</label>
+        <select id="closingStatus">
+          <option value="cozuldu">Çözüldü</option>
+          <option value="devam_ediyor">Devam Ediyor</option>
+          <option value="yonlendirildi">Yönlendirildi</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <label>Not (opsiyonel)</label>
+        <textarea id="closingNote" rows="3"></textarea>
+      </div>
+      <button id="closingSaveBtn" class="primary-btn">Kaydet ve Kapat</button>
+    </div>
+  </div>
+
+  <!-- Destek personeli kendi sifresini kendisi degistirir -->
+  <div id="changePasswordOverlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3>Şifre Değiştir</h3>
+      <div class="field-row">
+        <label>Mevcut Şifre</label>
+        <input id="currentPasswordInput" type="password" autocomplete="current-password" />
+      </div>
+      <div class="field-row">
+        <label>Yeni Şifre</label>
+        <input id="newPasswordInput" type="password" autocomplete="new-password" />
+      </div>
+      <div class="field-row">
+        <label>Yeni Şifre (Tekrar)</label>
+        <input id="newPasswordConfirmInput" type="password" autocomplete="new-password" />
+      </div>
+      <p id="changePasswordError" class="error-text hidden"></p>
+      <p id="changePasswordSuccess" class="success-text hidden">Şifreniz güncellendi.</p>
+      <div style="display:flex; gap:10px;">
+        <button id="changePasswordSaveBtn" class="primary-btn">Kaydet</button>
+        <button id="changePasswordCancelBtn" class="secondary-btn">Vazgeç</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Musteri "Bağlantı Talebi İlet" ile firma adini girer -->
+  <div id="connectionRequestOverlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3>Bağlantı Talebi İlet</h3>
+
+      <!-- Adim 1: telefon numarasi - kayitli mi degil mi anlamak icin -->
+      <div id="crPhoneStep">
+        <div class="field-row">
+          <label>Telefon Numarası</label>
+          <input id="crPhoneInput" type="tel" placeholder="+90 5XX XXX XX XX" autocomplete="tel" inputmode="tel" maxlength="16" />
+        </div>
+        <p id="crPhoneError" class="error-text hidden"></p>
+        <div style="display:flex; gap:10px;">
+          <button id="crPhoneContinueBtn" class="primary-btn">Devam Et</button>
+          <button id="crCancelBtn1" class="secondary-btn" type="button">Vazgeç</button>
+        </div>
+      </div>
+
+      <!-- Adim 2a: daha once kayitli musteri icin giris -->
+      <div id="crLoginStep" class="hidden">
+        <p class="hint" id="crLoginPhoneLabel"></p>
+        <div class="field-row">
+          <label>Şifre</label>
+          <input id="crLoginPasswordInput" type="password" autocomplete="current-password" />
+        </div>
+        <p id="crLoginError" class="error-text hidden"></p>
+        <div style="display:flex; gap:10px;">
+          <button id="crLoginSubmitBtn" class="primary-btn">Giriş Yap</button>
+          <button id="crCancelBtn2" class="secondary-btn" type="button">Vazgeç</button>
+        </div>
+      </div>
+
+      <!-- Adim 2b: yeni musteri kaydi -->
+      <div id="crRegisterStep" class="hidden">
+        <div class="field-row">
+          <label>Ad Soyad</label>
+          <input id="crRegisterNameInput" autocomplete="name" />
+        </div>
+        <div class="field-row">
+          <label>Telefon Numarası</label>
+          <input id="crRegisterPhoneLabel" disabled />
+        </div>
+        <div class="field-row">
+          <label>Vergi Numarası</label>
+          <input id="crRegisterTaxInput" inputmode="numeric" autocomplete="off" />
+        </div>
+        <div class="field-row">
+          <label>Şifre</label>
+          <input id="crRegisterPasswordInput" type="password" autocomplete="new-password" />
+        </div>
+        <label class="checkbox-row">
+          <input type="checkbox" id="crKvkkCheckbox" />
+          <span>Gizlilik Sözleşmesi ve KVKK Onayı</span>
+        </label>
+        <p id="crRegisterError" class="error-text hidden"></p>
+        <div style="display:flex; gap:10px;">
+          <button id="crRegisterSubmitBtn" class="primary-btn">Kayıt Ol ve Gönder</button>
+          <button id="crCancelBtn3" class="secondary-btn" type="button">Vazgeç</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Uygulama surumu / sirket bilgisi ve guvenlik beyanina baglanti -->
+  <div id="aboutOverlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <img class="brand-logo" src="assets/nexuson-logo.png" alt="NexusOn" style="margin-bottom:12px;" />
+      <h3 style="margin-top:0;">NexusOn</h3>
+      <p class="hint" id="aboutVersionText" style="margin-bottom:16px;"></p>
+      <p class="hint" style="margin-bottom:20px;">
+        NexusOn, Ab Yazılım tarafından geliştirilmiş bir uzaktan destek ve ekran paylaşımı uygulamasıdır.
+      </p>
+      <div style="display:flex; gap:10px;">
+        <button id="aboutSecurityLinkBtn" class="primary-btn" type="button">Güvenlik ve KVKK Bilgilendirmesi</button>
+        <button id="aboutCloseBtn" class="secondary-btn" type="button">Kapat</button>
+      </div>
+    </div>
+  </div>
 
   <script src="renderer.js"></script>
 </body>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<title>NexusOn Admin - Giriş</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="login-wrap">
+    <form id="loginForm" class="login-card">
+      <h1>Nexus<span>Go</span> Admin</h1>
+      <div class="field-row">
+        <label>Kullanıcı Adı</label>
+        <input id="username" autocomplete="username" required />
+      </div>
+      <div class="field-row">
+        <label>Şifre</label>
+        <input id="password" type="password" autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="primary-btn">Giriş Yap</button>
+      <div id="errorText" class="error-text"></div>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const errorText = document.getElementById('errorText');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorText.textContent = '';
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        window.location.href = 'dashboard.html';
+      } else {
+        errorText.textContent = data.error || 'Giriş başarısız.';
+      }
+    });
+
+    // Zaten giris yapilmissa direkt dashboard'a git
+    fetch('/api/session').then((r) => r.json()).then((s) => {
+      if (s.loggedIn) window.location.href = 'dashboard.html';
+    });
+  </script>
+</body>
+</html>

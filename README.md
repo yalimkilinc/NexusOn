@@ -17,6 +17,7 @@ hicbir sey odenmedigi gorulebilir:
 | Electron | Windows masaustu uygulamasi cati (framework) | MIT lisans, $0 |
 | `@nut-tree-fork/nut-js` | Uzaktan fare/klavye enjeksiyonu | MIT lisans, $0 |
 | `electron-builder` | Kurulum dosyasi (.exe) uretme | MIT lisans, $0 |
+| Express + `better-sqlite3` + `bcryptjs` + `multer` (admin-panel) | Slider/duyuru yonetimi, giris, dosya sunumu | Hepsi MIT/ISC lisans, $0. SQLite tek dosya, ayri veritabani sunucusu gerektirmez |
 
 **Odenmesi gerekebilecek TEK kalem** (zorunlu degil, itibar/guven icin
 onerilir): kod imzalama sertifikasi — yillik sabit ucret (~$100-300/yil),
@@ -34,7 +35,10 @@ altyapi maliyeti disinda kullanim ucreti yoktur.
 ```
 NexusGo/
   signaling-server/   Node.js WebSocket sinyal sunucusu (oda kodu eslestirme)
-  app/                 Electron masaustu uygulamasi (Windows)
+  app/                 Electron masaustu uygulamasi (Windows) — tek kurulum, rol secimli
+  admin-panel/
+    server/             Express + SQLite backend (giris, icerik API, kurulum uretme)
+    public/              Web tabanli admin arayuzu (login.html, dashboard.html)
 ```
 
 ## Calistirma (yerel test)
@@ -47,36 +51,65 @@ NexusGo/
    ```
    `ws://localhost:7777` adresinde calisir.
 
-2. Uygulamayi iki kere baslatin (biri Host, biri Viewer olacak — gercek
-   kullanimda iki farkli bilgisayarda calisir):
+2. (Opsiyonel ama onerilir) Admin panelini baslatin:
+   ```
+   cd admin-panel/server
+   npm install
+   npm start
+   ```
+   `http://localhost:4000` adresinde calisir. Ilk calistirmada konsola bir
+   admin kullanici adi/sifresi yazdirilir (varsayilan: `admin` / `admin123`).
+   **Uretimde `ADMIN_PASSWORD` ortam degiskeniyle mutlaka degistirin.**
+   Tarayicidan `http://localhost:4000/login.html` adresine gidip giris
+   yapabilir, slider gorsellerini ve duyuru metinlerini yonetebilirsiniz.
+
+3. Uygulamayi baslatin (musteri ve destek ekibi ayni kurulum icinde, acilista
+   rol secilir):
    ```
    cd app
    npm install
    npm start
    ```
+   Test icin bu adimi iki kere calistirip iki pencere acabilirsiniz.
 
-3. Birinci pencerede **"Bu Bilgisayarı Paylaş"** secin, **"Kod Üret"**e
-   basin, ardindan **"Bağlan"**a basin. Acilan Windows ekran-secim
+4. Birinci pencerede **"Destek Almak İçin"** secili kalsin, **"Destek Kodu
+   Oluştur ve Paylaşımı Başlat"**a basin. Acilan Windows ekran-secim
    penceresinden paylasilacak ekrani onaylayin.
 
-4. Ikinci pencerede **"Uzak Bilgisayara Bağlan"** secin, ayni kodu girin,
+5. Ikinci pencerede **"Destek Vermek İçin"**e gecin, ayni kodu girin,
    **"Bağlan"**a basin.
 
-5. Baglanti kurulunca host tarafinda ekran goruntusu viewer'da belirir.
+6. Baglanti kurulunca host tarafinda ekran goruntusu viewer'da belirir.
    Host, "Uzaktan kontrole izin ver" kutusunu isaretlerse viewer ekrana
    tiklayip fare/klavye ile kontrol edebilir. Her iki tarafta da
-   **"Dosya Gönder"** ile karsi tarafa dosya yollanabilir; alan taraf
-   kaydetme konumunu secer (onay mekanizmasi — sessiz/otomatik kabul yok).
+   **"Dosya Gönder"** ile karsi tarafa dosya yollanabilir (buton veya
+   surukle-birak); alan taraf kaydetme konumunu secer (onay mekanizmasi —
+   sessiz/otomatik kabul yok).
+
+## Admin panel
+
+Musteri (host) ekranindaki gorsel slider ve kayan duyuru yazisi, admin
+panelden yonetilir. NexusGo uygulamasi her acilista
+`http://localhost:4000/api/public/content` adresinden guncel icerigi ceker;
+panele ulasamazsa (kapali, offline vb.) sessizce yerel varsayilan icerikle
+calismaya devam eder, cokmez.
+
+Panelde ayrica **"Yeni Kurulum Üret"** butonu bulunur — basildiginda sunucu
+tarafinda `npm run dist` (electron-builder) calistirir ve bitince guncel
+`.exe` dosyasini indirtir. **Bu ozellik yalnizca panelin bir Windows
+makinesinde calismasi durumunda islev gorur** (Linux sunucuda derleme adimi
+calismaz).
 
 ## Su an eksik olan / bir sonraki adimlar
 
-- **Internet uzerinden gercek musteri baglantisi**: Su an sinyal sunucusu
-  `localhost`'ta. Gercek kullanim icin bu sunucunun herkese acik sabit bir
-  adrese (kucuk bir VPS, ~$5/ay sabit) tasinmasi gerekir — bu bir
-  "kullanim bazli ucret" degil, sabit altyapi maliyetidir.
+- **Internet uzerinden gercek musteri baglantisi**: Su an sinyal sunucusu ve
+  admin panel `localhost`'ta. Gercek kullanim icin ikisinin de herkese acik
+  sabit bir adrese (kucuk bir Windows VPS, sabit aylik ucret) tasinmasi
+  gerekir — bu bir "kullanim bazli ucret" degil, sabit altyapi maliyetidir.
+  NexusGo uygulamasindaki `DEFAULT_SERVER_URL` ve `CONTENT_API_URL`
+  degerlerinin de gercek adrese guncellenmesi gerekir.
 - **TURN relay** eklenmesi (siki kurumsal aglarda P2P baglanti kurulamazsa).
 - **Kod imzalama** (AV/SmartScreen guveni icin).
-- **Kimlik dogrulama / yetkilendirme** (su anki oda kodu herkese acik bir
-  eslestirme kodu; production icin destek personeli girisi + oturum kayitlari
-  eklenmeli).
+- **Admin panel sifresi**: varsayilan `admin`/`admin123` yalnizca yerel test
+  icindir, gercek kullanimdan once mutlaka degistirilmeli.
 - Ses aktarimi, coklu monitor secimi, oturum kayitlarinin (audit log) saklanmasi.

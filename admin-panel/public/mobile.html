@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="theme-color" content="#4f7dff" />
+<title>NexusOn Mobil</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="mobile.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Nexus<span>Go</span></div>
+    <div id="statusBadge" class="status status-disconnected">Bağlı değil</div>
+  </header>
+
+  <!-- 1) Personel girisi -->
+  <section id="loginScreen" class="screen">
+    <div class="card">
+      <h2>Destek Personeli Girişi</h2>
+      <div class="field-row">
+        <input id="usernameInput" placeholder="Kullanıcı Adı" autocomplete="username" />
+      </div>
+      <div class="field-row">
+        <input id="passwordInput" type="password" placeholder="Şifre" autocomplete="current-password" />
+      </div>
+      <button id="loginBtn" class="primary-btn">Giriş Yap</button>
+      <p id="loginError" class="error-text hidden"></p>
+    </div>
+  </section>
+
+  <!-- 2) Musteri (cari) secimi -->
+  <section id="customerScreen" class="screen hidden">
+    <div class="card">
+      <p class="hint">
+        Giriş yapan: <span id="usernameLabel"></span> ·
+        <button id="logoutBtn" class="link-btn" type="button">Çıkış Yap</button>
+      </p>
+      <h2>Müşteri Seçin</h2>
+      <div class="field-row">
+        <input id="customerSearchInput" placeholder="Müşteri kodu veya adı ile arayın..." autocomplete="off" />
+      </div>
+      <div id="customerResults" class="result-list"></div>
+    </div>
+  </section>
+
+  <!-- 3) Oda kodu girip baglanma -->
+  <section id="connectScreen" class="screen hidden">
+    <div class="card">
+      <p class="hint">
+        Giriş yapan: <span id="usernameLabel2"></span> ·
+        <button id="logoutBtn2" class="link-btn" type="button">Çıkış Yap</button>
+      </p>
+      <div class="selected-customer">
+        <span class="selected-customer-label">Seçili Müşteri</span>
+        <span id="selectedCustomerText"></span>
+        <button id="changeCustomerBtn" class="secondary-btn" type="button">Değiştir</button>
+      </div>
+      <div class="field-row">
+        <input id="roomCodeInput" maxlength="8" placeholder="Müşteriden Alınan Kod" autocomplete="off" inputmode="numeric" />
+      </div>
+      <button id="connectBtn" class="primary-btn">Bağlan</button>
+      <p id="connectError" class="error-text hidden"></p>
+    </div>
+  </section>
+
+  <!-- 4) Aktif oturum: ekran izleme + kontrol + dosya -->
+  <section id="sessionScreen" class="screen hidden full">
+    <div id="videoWrap" class="video-wrap">
+      <video id="remoteVideo" autoplay playsinline></video>
+      <div id="controlHint" class="control-hint">Dokunup sürükleyerek kontrol edin</div>
+    </div>
+    <div class="session-actions">
+      <button id="fileMenuBtn" class="secondary-btn small" type="button">Dosya</button>
+      <button id="disconnectBtn" class="danger-btn">Bağlantıyı Kes</button>
+    </div>
+    <div id="filePanel" class="file-panel hidden">
+      <div class="file-panel-header">
+        <h3>Dosya Aktarımı</h3>
+        <button id="sendFileBtn" class="primary-btn small" type="button">Dosya Gönder</button>
+        <input id="fileInput" type="file" class="hidden" />
+      </div>
+      <div id="transferList" class="transfer-list">
+        <p class="empty-hint">Henüz dosya aktarımı yok.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Gorusme kapanis formu -->
+  <div id="closingOverlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3>Görüşmeyi Kapat</h3>
+      <div class="field-row">
+        <label>Tür</label>
+        <select id="closingCategory">
+          <option value="hata">Hata</option>
+          <option value="sorun">Sorun</option>
+          <option value="istek">İstek</option>
+          <option value="gelistirme">Geliştirme Talebi</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <label>Durum</label>
+        <select id="closingStatus">
+          <option value="cozuldu">Çözüldü</option>
+          <option value="devam_ediyor">Devam Ediyor</option>
+          <option value="yonlendirildi">Yönlendirildi</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <label>Not (opsiyonel)</label>
+        <textarea id="closingNote" rows="3"></textarea>
+      </div>
+      <button id="closingSaveBtn" class="primary-btn">Kaydet ve Kapat</button>
+    </div>
+  </div>
+
+  <script src="mobile.js"></script>
+</body>
+</html>
