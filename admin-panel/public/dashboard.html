@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<title>NexusOn Admin - Panel</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Nexus<span>Go</span> Admin</div>
+    <div class="topbar-right">
+      <span id="whoami"></span>
+      <button id="logoutBtn" class="logout-btn">Çıkış Yap</button>
+    </div>
+  </header>
+
+  <div class="dashboard-layout">
+    <nav class="dashboard-nav">
+      <button class="nav-item active" data-page="slider">Görsel / Video Slider</button>
+      <button class="nav-item" data-page="news">Duyuru Metinleri</button>
+      <button class="nav-item" data-page="agents">Destek Personeli</button>
+      <button class="nav-item" data-page="tickets">Destek Kayıtları</button>
+      <button class="nav-item" data-page="v3">V3 Entegrasyonu</button>
+      <button class="nav-item" data-page="email">E-posta Ayarları</button>
+      <button class="nav-item" data-page="telegram">Telegram Bildirimleri</button>
+      <button class="nav-item" data-page="build">Kurulum Dosyası</button>
+    </nav>
+
+    <main class="dashboard">
+    <section id="page-slider" class="dashboard-page section-card">
+      <h2>Görsel / Video Slider</h2>
+      <p class="section-desc">Müşteri ekranındaki kayan slider'da sırayla gösterilir. Görsel veya kısa bir video (MP4/WebM, sesi otomatik kapalı ve döngüde oynatılır) yükleyebilirsiniz.</p>
+      <div id="slideList" class="slide-grid"></div>
+      <form id="slideForm" class="inline-form">
+        <div class="field-row">
+          <label>Başlık Metni</label>
+          <input id="slideText" required placeholder="Örn: Hızlı ve güvenli destek" />
+        </div>
+        <div class="field-row">
+          <label>Görsel veya Video (opsiyonel)</label>
+          <input id="slideImage" type="file" accept="image/*,video/mp4,video/webm" />
+        </div>
+        <button type="submit" class="primary-btn">Ekle</button>
+      </form>
+    </section>
+
+    <section id="page-news" class="dashboard-page section-card hidden">
+      <h2>Duyuru Metinleri</h2>
+      <p class="section-desc">Müşteri ekranındaki kayan yazı şeridinde art arda gösterilir.</p>
+      <div id="newsList" class="item-list"></div>
+      <form id="newsForm" class="inline-form">
+        <div class="field-row">
+          <label>Duyuru Metni</label>
+          <input id="newsText" required placeholder="Örn: Destek hattımız 09:00-18:00 arası açıktır." />
+        </div>
+        <button type="submit" class="primary-btn">Ekle</button>
+      </form>
+    </section>
+
+    <section id="page-agents" class="dashboard-page section-card hidden">
+      <h2>Destek Personeli</h2>
+      <p class="section-desc">NexusOn'nun Destek Ekibi ekranına giriş yapabilecek hesaplar.</p>
+      <div class="agent-row agent-list-header">
+        <span>Kullanıcı Kodu</span>
+        <span>Kullanıcı Adı</span>
+        <span>Telefon</span>
+        <span>E-Mail</span>
+        <span></span>
+        <span></span>
+      </div>
+      <div id="agentList" class="item-list"></div>
+      <form id="agentForm" class="inline-form">
+        <div class="field-row">
+          <label>Kullanıcı Kodu</label>
+          <input id="agentUsername" required placeholder="Örn: ayse01" />
+        </div>
+        <div class="field-row">
+          <label>Kullanıcı Adı</label>
+          <input id="agentFullName" placeholder="Örn: Ayşe Yılmaz" />
+        </div>
+        <div class="field-row">
+          <label>Telefon</label>
+          <input id="agentPhone" placeholder="Örn: 0532 000 00 00" />
+        </div>
+        <div class="field-row">
+          <label>E-Mail</label>
+          <input id="agentEmail" type="email" placeholder="Örn: ayse@abyazilim.com.tr" />
+        </div>
+        <div class="field-row">
+          <label>Parola</label>
+          <input id="agentPassword" type="text" required placeholder="Geçici bir şifre belirleyin" />
+        </div>
+        <button type="submit" id="agentSubmitBtn" class="primary-btn">Ekle</button>
+        <button type="button" id="agentCancelEditBtn" class="secondary-btn hidden">İptal</button>
+      </form>
+    </section>
+
+    <section id="page-tickets" class="dashboard-page section-card hidden">
+      <h2>Destek Kayıtları</h2>
+      <p class="section-desc">Her görüşme sonunda personelin doldurduğu kapanış formu burada listelenir.</p>
+      <div id="ticketStats" class="ticket-stats"></div>
+      <div id="ticketTableWrap" class="table-wrap">
+        <table class="ticket-table">
+          <thead>
+            <tr>
+              <th>Tarih</th>
+              <th>Personel</th>
+              <th>Oda Kodu</th>
+              <th>Müşteri Talebi</th>
+              <th>Tür</th>
+              <th>Durum</th>
+              <th>Süre</th>
+              <th>Personel Notu</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ticketTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="page-v3" class="dashboard-page section-card hidden">
+      <h2>V3 Entegrasyonu</h2>
+      <p class="section-desc">Nebim V3 (SQL Server) bağlantı bilgileri. Şifre bu sunucuda saklanır, hiçbir zaman uygulama koduna gömülmez.</p>
+      <form id="v3SettingsForm" class="inline-form" style="flex-direction:column; align-items:stretch;">
+        <div class="field-row">
+          <label>Sunucu Adresi</label>
+          <input id="v3Host" placeholder="Örn: 192.168.1.50 ya da sunucu.abyazilim.com.tr" />
+        </div>
+        <div class="field-row">
+          <label>Port</label>
+          <input id="v3Port" placeholder="1433" />
+        </div>
+        <div class="field-row">
+          <label>Veritabanı Adı</label>
+          <input id="v3Database" placeholder="Örn: Tekstil" />
+        </div>
+        <div class="field-row">
+          <label>Kullanıcı Adı</label>
+          <input id="v3Username" />
+        </div>
+        <div class="field-row">
+          <label>Şifre <span id="v3PasswordHint" class="section-desc" style="margin:0; display:inline;"></span></label>
+          <input id="v3Password" type="password" placeholder="Değiştirmek istemiyorsanız boş bırakın" />
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button type="submit" class="primary-btn" style="width:auto; padding:10px 18px;">Kaydet</button>
+          <button type="button" id="v3TestBtn" class="secondary-btn">Bağlantıyı Test Et</button>
+        </div>
+        <div id="v3TestResult" class="build-status"></div>
+      </form>
+
+      <div style="margin-top:20px;">
+        <button type="button" id="v3ListTablesBtn" class="secondary-btn">Tabloları Listele (cari tablosunu bulmak için)</button>
+        <div id="v3TablesResult" class="build-log hidden" style="max-height:180px;"></div>
+      </div>
+
+      <div style="margin-top:20px; padding-top:20px; border-top:1px solid var(--border);">
+        <p class="section-desc">Destek kayıtlarının V3'e yazılacağı, Nebim'in kendi tablolarına dokunmayan ayrı bir tablo.</p>
+        <button type="button" id="v3SetupTableBtn" class="secondary-btn">NexusOn Tablosunu Oluştur</button>
+        <div id="v3SetupTableResult" class="build-status"></div>
+      </div>
+    </section>
+
+    <section id="page-email" class="dashboard-page section-card hidden">
+      <h2>E-posta Ayarları</h2>
+      <p class="section-desc">Bir görüşme kapandığında yetkililere bildirim maili buradan gönderilir. Şifre bu sunucuda saklanır, hiçbir zaman uygulama koduna gömülmez.</p>
+      <form id="emailSettingsForm" class="inline-form" style="flex-direction:column; align-items:stretch;">
+        <div class="field-row">
+          <label>SMTP Sunucu Adresi</label>
+          <input id="emailSmtpHost" placeholder="Örn: smtp.office365.com" />
+        </div>
+        <div class="field-row">
+          <label>Port</label>
+          <input id="emailSmtpPort" placeholder="587" />
+        </div>
+        <div class="field-row">
+          <label><input type="checkbox" id="emailSmtpSecure" style="width:auto; margin-right:6px;" />SSL/TLS kullan (genelde 465 portu için)</label>
+        </div>
+        <div class="field-row">
+          <label>SMTP Kullanıcı Adı</label>
+          <input id="emailSmtpUser" placeholder="Örn: bildirim@abyazilim.com.tr" />
+        </div>
+        <div class="field-row">
+          <label>SMTP Şifresi <span id="emailSmtpPasswordHint" class="section-desc" style="margin:0; display:inline;"></span></label>
+          <input id="emailSmtpPassword" type="password" placeholder="Değiştirmek istemiyorsanız boş bırakın" />
+        </div>
+        <div class="field-row">
+          <label>Gönderen Adresi</label>
+          <input id="emailFromAddress" placeholder="Örn: NexusOn <bildirim@abyazilim.com.tr>" />
+        </div>
+        <div class="field-row">
+          <label>Yetkili Bildirim Adresleri (virgülle ayırın)</label>
+          <input id="emailRecipients" placeholder="Örn: yusuf@abyazilim.com.tr, destek@abyazilim.com.tr" />
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button type="submit" class="primary-btn" style="width:auto; padding:10px 18px;">Kaydet</button>
+          <button type="button" id="emailTestBtn" class="secondary-btn">Test E-postası Gönder</button>
+        </div>
+        <div id="emailTestResult" class="build-status"></div>
+      </form>
+
+      <div style="margin-top:20px; padding-top:20px; border-top:1px solid var(--border);">
+        <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+          <input type="checkbox" id="emailWeeklyEnabled" style="width:auto;" />
+          Müşterilere haftalık destek özeti gönder (her Pazartesi 08:00, V3'teki müşteri e-postasına)
+        </label>
+        <button type="button" id="emailWeeklyNowBtn" class="secondary-btn">Şimdi Gönder (Test)</button>
+        <div id="emailWeeklyResult" class="build-status"></div>
+      </div>
+    </section>
+
+    <section id="page-telegram" class="dashboard-page section-card hidden">
+      <h2>Telegram Bildirimleri</h2>
+      <p class="section-desc">Müşteri ekranındaki "Bağlantı Talebi İlet" ile firma adı girip talep gönderdiğinde, destek ekibine buradaki bota Telegram mesajı gider. Token bu sunucuda saklanır, hiçbir zaman uygulama koduna gömülmez.</p>
+      <form id="telegramSettingsForm" class="inline-form" style="flex-direction:column; align-items:stretch;">
+        <div class="field-row">
+          <label>Bot Token <span id="telegramTokenHint" class="section-desc" style="margin:0; display:inline;"></span></label>
+          <input id="telegramBotToken" placeholder="Değiştirmek istemiyorsanız boş bırakın" />
+        </div>
+        <div class="field-row">
+          <label>Chat ID</label>
+          <input id="telegramChatId" placeholder="Örn: 123456789 veya -1001234567890 (grup)" />
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button type="submit" class="primary-btn" style="width:auto; padding:10px 18px;">Kaydet</button>
+          <button type="button" id="telegramTestBtn" class="secondary-btn">Test Mesajı Gönder</button>
+        </div>
+        <div id="telegramTestResult" class="build-status"></div>
+      </form>
+    </section>
+
+    <section id="page-build" class="dashboard-page section-card hidden">
+      <h2>Kurulum Dosyası</h2>
+      <p class="section-desc">
+        Güncel NexusOn kurulum dosyasını (.exe) yeniden derler. Bu işlem birkaç
+        dakika sürebilir ve panelin çalıştığı bilgisayarda Windows derleme
+        araçlarının kurulu olmasını gerektirir.
+      </p>
+      <button id="buildBtn" class="primary-btn" style="width:auto; padding:10px 20px;">Yeni Kurulum Üret</button>
+      <div id="buildStatus" class="build-status"></div>
+      <div id="buildLog" class="build-log hidden"></div>
+      <a id="downloadLink" class="download-link hidden" href="#">İndir: kurulum dosyası hazır</a>
+      <p class="section-desc" style="margin-top:16px;">
+        Müşterilere/personele verilecek <strong>sabit indirme linki</strong> (her yeni derlemeden sonra otomatik güncellenir):<br />
+        <code>https://nexuson.abyazilim.com.tr:11086/download/NexusOn-Setup.exe</code>
+      </p>
+    </section>
+    </main>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

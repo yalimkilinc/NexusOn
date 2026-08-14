@@ -1,8 +1,8 @@
 {
-  "name": "nexusgo",
-  "version": "0.1.0",
+  "name": "nexuson",
+  "version": "1.0.24",
   "private": true,
-  "description": "NexusGo - musteri bilgisayarlarina uzaktan destek uygulamasi (Windows).",
+  "description": "NexusOn - musteri bilgisayarlarina uzaktan destek uygulamasi (Windows).",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -10,18 +10,44 @@
   },
   "devDependencies": {
     "electron": "^32.0.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "node-gyp": "^13.0.1"
   },
   "dependencies": {
-    "@nut-tree-fork/nut-js": "^4.2.6"
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "windows-desktop-duplication": "^1.0.3"
   },
   "build": {
-    "appId": "com.nexusgo.app",
-    "productName": "NexusGo",
+    "appId": "com.nexuson.app",
+    "productName": "NexusOn",
+    "npmRebuild": false,
     "win": {
-      "target": ["nsis"],
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "icon": "build/icon.ico"
     },
-    "files": ["**/*", "!node_modules/@nut-tree-fork/**/build/**/*.{o,obj}"]
+    "files": [
+      "**/*",
+      "!node_modules/@nut-tree-fork/**/build/**/*.{o,obj}",
+      "!node_modules/windows-desktop-duplication/build/**/*.{obj,pdb,iobj,ipdb,lib,tlog,exp}",
+      "!node_modules/windows-desktop-duplication/build/**/*.tlog",
+      "!node_modules/windows-desktop-duplication/build/Release/obj"
+    ],
+    "asarUnpack": [
+      "unicode-typer.ps1"
+    ],
+    "protocols": {
+      "name": "NexusOn Connect",
+      "schemes": ["nexuson"]
+    }
+  },
+  "allowScripts": {
+    "windows-desktop-duplication@1.0.3": true,
+    "electron@32.3.3": true
+  },
+  "overrides": {
+    "node-gyp": "^13.0.1"
   }
 }

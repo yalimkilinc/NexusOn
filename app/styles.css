@@ -32,15 +32,100 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 10px 18px;
-  background: var(--panel);
+  /* ONEMLI: ust cubuk kendi rengi olan ayri bir "blok" gibi durmasin diye
+     bilerek arka plan atamiyoruz - body'nin (ana ekranin) --bg rengi
+     seffaf sekilde arkadan gorunup tek, kesintisiz bir yuzey olusturuyor
+     (bkz. kullanicinin isaretledigi ekran goruntusu - beyaz seridin ana
+     ekrana "dahil edilmesi" istegi). */
+  background: transparent;
   border-bottom: 3px solid var(--accent);
   transition: border-color 0.2s;
+  /* frame:false ile Windows'un kendi baslik cubugu kaldirildi (bkz. main.js) -
+     bu yuzden kendi ust cubugumuzun bos alanlari artik PENCEREYI SURUKLEMEK
+     icin de kullanilabilir olmali, tipki bir baslik cubugu gibi. Icindeki
+     tiklanabilir ogeler (butonlar, linkler, pencere kontrolleri) asagida
+     tek tek no-drag ile bundan muaf tutuluyor - aksi halde tiklanamaz hale
+     gelirler. */
+  -webkit-app-region: drag;
+}
+.topbar button,
+.topbar a,
+.topbar input,
+.topbar .file-panel-dropdown {
+  -webkit-app-region: no-drag;
 }
 
 .topbar-left { display: flex; align-items: center; gap: 10px; }
 
-.brand { font-size: 18px; font-weight: 700; letter-spacing: 0.3px; }
-.brand span { color: var(--accent-2); }
+/* Windows'un kaldirilan kendi kucult/buyut/kapat dugmelerinin yerini alan
+   ozel dugmeler (bkz. index.html #windowControls, main.js frame:false).
+   Ust cubuk koyu ana ekranla ayni renkte oldugu icin ikon rengi de koyu
+   zemine gore (acik) seciliyor. */
+.window-controls { display: flex; align-items: center; gap: 2px; margin-left: 4px; -webkit-app-region: no-drag; }
+.window-control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-radius: 4px;
+}
+.window-control-btn:hover { background: var(--panel-2); color: var(--text); }
+.window-control-close:hover { background: var(--danger); color: white; }
+
+.update-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #e8b93b22;
+  color: #e8b93b;
+  font-size: 12.5px;
+  border-bottom: 1px solid #e8b93b55;
+}
+.update-now-btn {
+  background: #e8b93b;
+  color: #1a1500;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.update-now-btn:hover { opacity: 0.85; }
+.update-now-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.update-banner-close {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.brand-logo { height: 26px; width: auto; display: block; }
+
+.app-version-text {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.app-version-text:hover { color: var(--text); text-decoration: underline; }
 
 .role-badge {
   font-size: 11px;
@@ -71,21 +156,83 @@ html, body {
 .panel { flex: 1; padding: 20px; overflow: auto; }
 
 /* --- Setup panel --- */
+/* ONEMLI: Grid kullaniyoruz (flex degil) - 2 satir:
+   1) sol kart (.left-col) ile sag ust blok (duyuru+slider, .right-col) AYNI
+      SATIRDA, Grid'in varsayilan davranisiyla (stretch) birbirine otomatik
+      yukseklik esitleniyor (piksel piksel - bkz. .hero-slider aciklamasi).
+   2) sol altta "Baglanti Talebi Ilet" karti (.left-bottom-card), sag altta
+      ise iletisim bilgileri (.contact-card) ust uste/yigin halinde, sag
+      kenara yasli - bu ikisi de AYNI satirda oldugundan Grid stretch ile
+      alt sinirlari otomatik esitleniyor. */
 .setup-layout {
-  display: flex;
+  display: grid;
+  grid-template-columns: 440px 1fr;
+  grid-template-rows: auto auto;
   gap: 24px;
-  align-items: flex-start;
+  /* ONEMLI: .setup-panel (.panel sinifindan) flex:1 ile TUM dikey alani
+     dolduruyor - Grid'in varsayilan align-content (stretch) davranisi bu
+     yuzden iki auto satiri da bu tam yuksekligi doldurana kadar BUYUTUYORDU
+     (hero-slider'i ne kadar kucultursek kucultelim, alt satir onu telafi
+     edip buyuyor, alt bosluk hep 0 kaliyordu). "start" ile satirlar kendi
+     dogal (auto) yuksekliklerinde kalir, kalan bosluk EN ALTTA gercek bir
+     bosluk olarak gorunur - musteri talebi (alt tarafta gorunur bosluk).
+  */
+  align-content: start;
 }
 
-.setup-card {
-  flex: 0 0 440px;
+.left-col {
+  /* Musteri geri bildirimi: setupCard (rol secimi/kod) ve leftBottomCard
+     (Bağlantı Talebi İlet) ayri iki cerceve gibi durmamali, TEK bir cerceve
+     olmali. Cerceveyi (border/background/padding) artik burada tasiyoruz;
+     iki ic bolum (setup-card, left-bottom-card) kendi cercevesini/dolgusunu
+     birakip TEK dis cercevenin icinde ust uste akiyor, aralarinda ince bir
+     ayirici cizgi var (bkz. .left-bottom-card border-top). Sag taraftaki IKI
+     satiri (duyuru+slider, iletisim) kapsayabilmesi icin grid-row artik
+     1'den 2'ye kadar (span 2) uzaniyor.
+  */
+  grid-column: 1;
+  grid-row: 1 / 3;
   max-width: 440px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 24px;
   box-shadow: 0 8px 30px #00000040;
 }
+
+.left-bottom-card {
+  width: 100%;
+  padding-top: 20px;
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.left-bottom-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+
+.setup-card {
+  /* ONEMLI: cerceve (border/background/padding) artik .left-col'da (bkz.
+     yukarida) - bu artik sadece ic icerik sarmalayicisi. .left-col Grid'de
+     iki satiri birden kapladigi (grid-row:1/3) icin Grid kendi stretch
+     davranisiyla dogru yuksekligi otomatik veriyor - ResizeObserver ile elle
+     senkronize etmeye artik GEREK YOK (bkz. renderer.js - syncSetupCardHeight
+     kaldirildi). */
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#hostSetup.role-setup { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+#hostSetup .field-row { display: flex; flex-direction: column; flex: 1; min-height: 0; margin-bottom: 16px; }
+#hostSetup .field-row textarea { flex: 1; height: auto; min-height: 0; }
 
 .role-choice { display: flex; gap: 10px; margin-bottom: 20px; }
 .role-btn {
@@ -127,18 +274,27 @@ html, body {
 }
 .code-display .secondary-btn.small { margin-top: 12px; }
 
-/* --- Duyuru seridi + iletisim karti (yalnizca Musteri ekraninda) --- */
-.news-panel {
-  flex: 1;
+/* --- Duyuru seridi + gorsel slider (yalnizca Musteri ekraninda) --- Grid'in
+   ilk satirinda, sol karttaki (.left-col) yukseklikle otomatik esitlenir. */
+.right-col {
+  grid-column: 2;
+  grid-row: 1;
   min-width: 280px;
+  /* bkz. .hero-slider yorumu: genis-ama-alcak pencerelerde alt karti disari
+     itmemesi icin slider'in genisligi (dolayisiyla sabit orandaki
+     yuksekligi) sinirlaniyor. Bunu SADECE hero-slider'a degil tum sutuna
+     (duyuru seridi DAHIL) uyguluyoruz ki ikisi ayni genislikte kalip
+     duyuru seridinin altinda bosluk birakmasin. */
+  width: min(100%, 780px);
+  justify-self: center;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   gap: 16px;
 }
 
 .ticker-viewport {
-  flex: 1;
-  min-height: 140px;
+  min-height: 70px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -154,7 +310,7 @@ html, body {
   white-space: nowrap;
   font-size: 15px;
   font-weight: 500;
-  color: var(--text);
+  color: var(--accent); /* logodaki "Go" ekinin mavisiyle ayni */
   animation: ticker-scroll 14s linear infinite;
 }
 
@@ -163,39 +319,160 @@ html, body {
   to { transform: translateX(100%); }
 }
 
-.contact-card {
-  align-self: flex-end;
+/* --- Gorsel slider (anasayfa hero mantigi: gorsel + baslik + ok/nokta) ---
+   Yuklenecek gorseller 1200x628px (1.91:1) oldugundan, alan bu orana kilitli:
+   boylece gorseller kirpilmadan/bozulmadan tam oturur ve pencere yeniden
+   boyutlandirilirken (resize) sarsinti/gecikme olmadan, aninda, CSS ile
+   yeniden hesaplanir (flex:1 ile "kalan alani doldur" YONTEMI DENENDI ve
+   TERK EDILDI - pencere kucuk oldugunda .setup-card'in kendi min-icerigi
+   satiri gerektiginden fazla uzatiyor, slider da onu doldurmaya calisirken
+   duzensiz/sarsintili gorunuyordu). Sol karttaki (.setup-card) alt kenarla
+   PIKSEL PIKSEL hizalama artik renderer.js'teki ResizeObserver ile saglaniyor
+   (bkz. syncSetupCardHeight) - .right-col'un GERCEK render yuksekligi
+   olculup .setup-card'a aynen uygulaniyor, boylece slider genislige gore
+   SABIT/ONGORULEBILIR kaliyor, sadece sol kart ona uyum sagliyor. */
+.hero-slider {
+  position: relative;
+  /* ONEMLI (musteri geri bildirimi, 1920x1080 + %125 olcekleme = 1536x816
+     mantiksal piksel): genislige gore buyuyen aspect-ratio, tam genislikte
+     alt satirdaki "Bağlantı Talebi İlet" kartini viewport disina itiyordu.
+     ILK DENEMEDE max-height ile yuksekligi sinirlamistik - YANLISTI:
+     genislik 100% sabit kalinca gorsel (background-size:cover) artik oranin
+     tutmadigi bir kutuya sigdirilmaya calisildi, ust/alt kenarlari (logo
+     dahil) kirpildi. DOGRU cozum: GENISLIGI .right-col'da sinirlamak (bkz.
+     yukarida) - aspect-ratio burada SABIT kalir, gorsel hicbir zaman
+     kirpilmez/bozulmaz, genislik kucaldikce yukseklik oranla otomatik
+     kuculur. Burada sadece aspect-ratio yeterli, genislik sutundan gelir. */
   width: 100%;
-  max-width: 300px;
-  background: var(--panel);
+  aspect-ratio: 1.91 / 1;
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 16px;
+  overflow: hidden;
   box-shadow: 0 8px 30px #00000040;
+  background: var(--panel);
 }
-.contact-card-title {
-  font-size: 11px;
+.hero-slides-container { position: absolute; inset: 0; }
+.hero-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.hero-slide.active { opacity: 1; }
+.hero-slide-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hero-slide-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, #0f1420ee 0%, #0f142099 42%, transparent 78%);
+}
+.hero-slide-text {
+  position: relative;
+  padding: 26px 60px 34px 24px;
+  font-size: 19px;
   font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--accent-2);
-  margin-bottom: 8px;
+  line-height: 1.35;
+  max-width: 85%;
+  text-shadow: 0 2px 10px #000000a0;
 }
+.hero-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #00000066;
+  border: 1px solid #ffffff33;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  cursor: pointer;
+  z-index: 2;
+}
+.hero-arrow.left { left: 12px; }
+.hero-arrow.right { right: 12px; }
+.hero-arrow:hover { background: #000000aa; }
+.hero-dots {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+}
+.hero-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffffff55;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.hero-dot.active { background: white; width: 18px; border-radius: 4px; }
+
+/* Iletisim bilgileri: telefon/website/e-posta ust uste (dikey), ayri
+   kartlar halinde, sag sutunun ALT satirinda (.setup-layout grid-row:2),
+   sag kenara yasli - sayfanin sag-alt kosesi. Genislik, en uzun icerik olan
+   website adresini ("www.abyazilim.com.tr") kapsayacak sekilde SABIT -
+   boylece 3 kart da ayni genislikte, duzenli bir yigin olusturur. */
+.contact-card {
+  grid-column: 2;
+  grid-row: 2;
+  /* ONEMLI: .right-col (duyuru+slider) artik tam sutun genisligini degil,
+     min(100%, 780px) kadarini kullanip ortalaniyor (bkz. .right-col). Bu
+     kutu genislik sinirlamasi olmadan tam sutun genisligini kullanmaya
+     devam ederse, sag kenara yaslanan iletisim kartlari slider'in sag
+     kenariyla degil, TUM sutunun sag kenariyla hizalanir - musteri bunu
+     ekran goruntusunde gordu. Ayni sinir/ortalama burada da uygulanarak
+     ikisinin sag kenari BIREBIR ayni noktada bulusuyor. */
+  width: min(100%, 780px);
+  justify-self: center;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* Musteri talebi: telefon sagda, web sitesi ortada, e-posta solda dursun -
+   DOM sirasi (telefon, website, e-posta) JS referanslariyla eslesecegi
+   icin degistirilmiyor, sadece flex "order" ile GORSEL sirayi ayirdik. */
+#contactEmail { order: 1; }
+#contactWebsite { order: 2; }
+#contactWhatsapp { order: 3; }
+
 .contact-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  background: none;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 6px;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  width: 230px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
   color: var(--text);
   font-size: 13px;
   cursor: pointer;
   text-align: left;
+  box-shadow: 0 8px 30px #00000040;
 }
-.contact-row:hover { background: var(--panel-2); }
+.contact-row:hover { border-color: var(--accent); background: var(--panel-2); }
 .contact-icon { width: 18px; height: 18px; flex-shrink: 0; color: var(--accent-2); }
 .contact-text { overflow: hidden; text-overflow: ellipsis; }
 
@@ -203,15 +480,9 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 button { transition: background-color 0.15s, border-color 0.15s, opacity 0.15s, transform 0.1s; }
 button:active:not(:disabled) { transform: scale(0.97); }
 
-.file-panel { transition: border-color 0.15s, background-color 0.15s; }
-.file-panel.drag-over {
-  border-color: var(--accent);
-  background: #1d2c55;
-}
-
 .field-row { margin-bottom: 16px; }
 .field-row label { display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px; }
-.field-row input {
+.field-row input, .field-row select, .field-row textarea {
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
@@ -219,10 +490,85 @@ button:active:not(:disabled) { transform: scale(0.97); }
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
+  font-family: inherit;
 }
+.field-row textarea { resize: vertical; }
+.field-row input:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 16px;
+  font-size: 13px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.checkbox-row input[type="checkbox"] { width: 16px; height: 16px; flex-shrink: 0; cursor: pointer; }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: #00000090;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 8px 30px #00000060;
+}
+.modal-card h3 { margin: 0 0 16px; font-size: 16px; }
 .inline-row { display: flex; gap: 8px; }
 .inline-row input { flex: 1; }
 .hint { color: var(--text-dim); font-size: 12px; margin: 6px 0 0; }
+.error-text {
+  color: var(--danger);
+  font-size: 12.5px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #ef546855;
+  border-radius: 8px;
+  background: #3a1a20;
+  line-height: 1.5;
+}
+
+.success-text {
+  color: var(--success);
+  font-size: 12.5px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #35c98f55;
+  border-radius: 8px;
+  background: #16302a;
+  line-height: 1.5;
+}
+
+.customer-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.customer-result-row {
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+}
+.customer-result-row:hover { border-color: var(--accent); }
+.customer-result-row .cari-kodu { color: var(--text-dim); font-size: 11.5px; display: block; margin-top: 2px; }
 
 .primary-btn {
   width: 100%;
@@ -259,7 +605,39 @@ button:active:not(:disabled) { transform: scale(0.97); }
   cursor: pointer;
 }
 
-.session-actions { display: flex; align-items: center; gap: 14px; }
+/* Ust cubuktaki tum aksiyon butonlari (Dosya Aktarimi / Teknik Gunlugu Goster /
+   Baglantiyi Kes) ayni boyut ve tipte gorunsun - sadece renk vurgusu farkli. */
+.topbar-right .file-menu-btn,
+.topbar-right .link-btn,
+.topbar-right .danger-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 5px 12px;
+  margin-top: 0;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  cursor: pointer;
+}
+.topbar-right .link-btn { color: var(--text-dim); background: transparent; }
+.topbar-right .link-btn:hover { color: var(--accent-2); border-color: var(--accent); }
+.topbar-right .danger-btn { border-color: #ef546855; color: var(--danger); background: transparent; }
+.topbar-right .danger-btn:hover { background: #ef546818; }
+
+.screen-select {
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+}
 
 .link-btn {
   margin-top: 12px;
@@ -273,9 +651,99 @@ button:active:not(:disabled) { transform: scale(0.97); }
 }
 .link-btn:hover { color: var(--accent-2); }
 
+/* Sekme seridi + kurulum/oturum panellerini yan yana tutan sarmalayici -
+   boylece "+ Yeni Baglanti" ile kurulum ekranina donulse bile var olan
+   oturumlarin sekmeleri gorunur/erisilebilir kalir. */
+.main-body { flex: 1; display: flex; flex-direction: row; gap: 10px; min-height: 0; }
+
 /* --- Session panel --- */
-.session-panel { display: flex; gap: 16px; }
-.session-main { flex: 3; display: flex; flex-direction: column; }
+.session-panel { display: flex; }
+
+/* Destek ekibi: ayni anda birden fazla musteriye baglaninca sekmeler burada -
+   video alanini olabildigince genis birakmak icin dar dikey bir seritte.
+   Serit, video alanina daha da yer acmak icin gizlenip acilabilir (asagidaki
+   .session-tabs-toggle). */
+.session-tabs-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 190px;
+  flex-shrink: 0;
+  transition: width 0.15s ease;
+}
+.session-tabs-rail.collapsed { width: 0; }
+.session-tabs-rail.collapsed .session-tabs { display: none; }
+
+/* Kenar cizgisi uzerinde, dikey ortalanmis daralt/genislet tutamagi -
+   sekme seridiyle video alani arasindaki sinirda oturur. */
+.session-tabs-toggle {
+  position: absolute;
+  top: 50%;
+  right: -12px;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.session-tabs-toggle:hover { border-color: var(--accent); color: var(--text); }
+
+.session-tabs {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.session-tab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text-dim);
+  font-size: 12.5px;
+  cursor: pointer;
+  overflow: hidden;
+}
+.session-tab span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-tab.active { border-color: var(--accent); color: var(--text); background: var(--panel-2); }
+.session-tab-close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.7;
+}
+.session-tab-close:hover { opacity: 1; color: var(--danger); }
+.session-tab-add {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  background: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.session-tab-add:hover { border-color: var(--accent); color: var(--text); }
 
 .video-wrap {
   position: relative;
@@ -288,9 +756,52 @@ button:active:not(:disabled) { transform: scale(0.97); }
   align-items: center;
   justify-content: center;
   outline: none;
-  cursor: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNiIgaGVpZ2h0PSIyNiIgdmlld0JveD0iMCAwIDI2IDI2Ij48cGF0aCBkPSJNMyAyIEwzIDIwIEw4IDE1LjggTDExLjMgMjMgTDE0LjYgMjEuNSBMMTEuMyAxNC4zIEwxOCAxNC4zIFoiIGZpbGw9IiM0ZjdkZmYiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMS40IiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=') 3 2, pointer;
 }
+
+/* ONEMLI (asil duzeltme): kendi imlecimizi gizleme/gosterme konusunda ileri
+   geri gittik cunku musteri makinesine gore imlecin videoya gomulu olup
+   olmadigi DEGISIYORDU (bazilarinda hic yok, bazilarinda zaten gomulu geliyor
+   - donanim/surucu farki). Artik tahmin etmiyoruz: native modul DXGI'nin
+   kendi PointerPosition/hardwareCursorMode verisini okuyup (bkz.
+   windows-desktop-duplication yamasi, renderer.js sendCursorPos) ayri bir
+   #remoteCursorDot gostergesi olarak gonderiyor - SADECE donanim imleci
+   modunda (goruntude gercekten yok) gorunur oluyor. Bu yuzden kendi OS
+   imlecimizi burada YINE gizliyoruz - artik ne zaman gosterge gerektigini
+   tahmin etmiyoruz, DXGI'nin kendisi soyluyor. */
+/* NexusOn: AnyDesk/TeamViewer gibi gercek uzaktan masaustu araclari kendi
+   fareyi video uzerinde HICBIR ZAMAN gizlemez - kullanicinin kendi imleci
+   (aninda, agdan bagimsiz) her zaman normal gorunur, video icerigindeki
+   (musterinin ekranindaki) imlec ayri bir seydir ve dogal olarak bir arada
+   var olur. cursor:none ile kendi imleci gizleyip yerine agdan gelen bir
+   gosterge koymaya calismak standart olmayan, kafa karistirici bir tasarimdi. */
 .video-wrap video { width: 100%; height: 100%; object-fit: contain; }
+
+/* ONEMLI (CANLI KANITLANDI - ShareX ekran kaydiyla): yukaridaki "kendi
+   imlecimizi hep goster" karari getDisplayMedia yedek yakalama yoluna
+   dusuldugunde YANLIS - o yolda gercek imlec zaten HER ZAMAN videoya gomulu
+   geliyor (Electron'da bunu bastirmanin bir yolu yok, bkz. renderer.js
+   switchToDisplayMediaFallback yorumu) ve kendi yerel imlecimiz de ustune
+   binince ekranda "birbirini takip eden iki imlec" gorunuyor. DXGI yolunda
+   ise video hicbir zaman imlec icermiyor, o yuzden orada yerel imlece
+   dokunmuyoruz. Bu sinif SADECE getDisplayMedia aktifken renderer.js
+   tarafindan eklenir/kaldirilir. */
+.video-wrap.embedded-cursor video { cursor: none; }
+
+.remote-cursor-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+  z-index: 5;
+  filter: drop-shadow(0 1px 2px #000c);
+  /* DXGI yolunda gosterge, agdan gelen ayri konum mesajlarina gore
+     "isinlanarak" hareket ediyordu - kucuk bir gecis, art arda mesajlar
+     arasindaki bosluklari yumusatip daha akici gorunmesini saglar. */
+  transition: left 80ms linear, top 80ms linear;
+}
+.remote-cursor-dot svg { width: 100%; height: 100%; fill: #e02424; stroke: #fff; stroke-width: 1; }
 
 .host-placeholder {
   position: absolute;
@@ -317,16 +828,47 @@ button:active:not(:disabled) { transform: scale(0.97); }
   color: var(--text-dim);
 }
 
-/* --- File panel --- */
-.file-panel {
-  flex: 1;
-  min-width: 260px;
+/* --- Dosya menusu (topbar) --- */
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.file-menu-wrap { position: relative; }
+
+.file-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.file-menu-btn:hover { border-color: var(--accent); }
+.file-menu-btn.active { border-color: var(--accent); background: var(--panel); }
+
+/* --- File panel (dropdown) --- */
+.file-panel-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 320px;
+  max-height: 420px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 12px 30px #00000055;
+  z-index: 20;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.file-panel-dropdown.drag-over {
+  border-color: var(--accent);
+  background: #1d2c55;
 }
 .file-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .file-panel-header h3 { margin: 0; font-size: 14px; }

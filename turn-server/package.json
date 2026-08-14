@@ -1,0 +1,10 @@
+{
+  "name": "nexusgo-turn-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NexusGo TURN (relay) sunucusu - STUN yetersiz kaldiginda WebRTC baglantisini kurtarir.",
+  "main": "server.js",
+  "dependencies": {
+    "node-turn": "^0.0.6"
+  }
+}

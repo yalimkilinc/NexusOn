@@ -1,0 +1,20 @@
+{
+  "name": "nexusgo-admin-panel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NexusGo icin ucretsiz, kendi barindirdigin admin paneli (slider/duyuru yonetimi + kurulum dosyasi uretme).",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.1",
+    "bcryptjs": "^2.4.3",
+    "express-session": "^1.18.1",
+    "cors": "^2.8.5",
+    "multer": "^1.4.5-lts.1",
+    "mssql": "^12.7.0",
+    "nodemailer": "^9.0.3",
+    "node-cron": "^4.6.0"
+  }
+}

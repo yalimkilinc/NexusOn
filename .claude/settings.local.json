@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(tasklist //FI \"IMAGENAME eq electron.exe\")"
+      "Bash(tasklist //FI \"IMAGENAME eq electron.exe\")",
+      "Bash(npm start *)",
+      "Bash(grep -n \"state.agent = \\\\|agent-logout\\\\|agent/tickets/start\\\\|agent/tickets/\\\\${ticketId}/end\\\\|credentials: 'include'\" \"/c/Projects/NexusGo/app/renderer.js\")"
     ]
   }
 }

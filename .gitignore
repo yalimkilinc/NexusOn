@@ -4,6 +4,22 @@ app/dist/
 app/build/
 signaling-server/dist/
 
+# Build/çalışma zamanı çıktıları (kaynak kod değil)
+admin-panel/server/downloads/
+admin-panel/server/uploads/
+admin-panel/server/data.sqlite*
+videos/
+
+# Uygulama kaynak kodu olmayan, ilgisiz taslak/yedek çalışmalar
+deploy/
+scratch-pptx/
+scratch-slides/
+scratchpad-*.png
+scratchpad-*.log
+NexusGo.png
+NEXUSGO-TANITIM-PROMPT.md
+HYPERFRAMES-VIDEO-SURECI.md
+
 # Editörler / OS
 .vscode/
 .idea/
