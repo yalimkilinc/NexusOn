@@ -884,17 +884,30 @@ function finishConnectionRequest(customer) {
   }).catch(() => {});
 }
 
-// Yazarken sadece basta tek bir '+' ve rakamlara izin verir (E.164 bicimi) -
-// baska hicbir karaktere (harf, bosluk, tire vb.) izin verilmez.
+// Musteri numarayi nasil yazarsa yazsin (basinda 0, 90, +90, hicbiri; arada
+// bosluk/tire olsun olmasin) her tus vurusunda "+90 5XX XXX XX XX" bicimine
+// (10 haneli Turk cep telefonu, 3-3-2-2 gruplu) otomatik cevirir.
+function formatTurkishPhone(raw) {
+  let digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('0090')) digits = digits.slice(4);
+  else if (digits.startsWith('90')) digits = digits.slice(2);
+  if (digits.startsWith('0')) digits = digits.slice(1);
+  const rest = digits.slice(0, 10);
+
+  let out = '+90';
+  if (rest.length > 0) out += ' ' + rest.slice(0, 3);
+  if (rest.length > 3) out += ' ' + rest.slice(3, 6);
+  if (rest.length > 6) out += ' ' + rest.slice(6, 8);
+  if (rest.length > 8) out += ' ' + rest.slice(8, 10);
+  return out;
+}
+
 els.crPhoneInput.addEventListener('input', () => {
-  const raw = els.crPhoneInput.value;
-  const hasPlus = raw.startsWith('+');
-  const digits = raw.replace(/[^0-9]/g, '').slice(0, 15);
-  els.crPhoneInput.value = (hasPlus ? '+' : '') + digits;
+  els.crPhoneInput.value = formatTurkishPhone(els.crPhoneInput.value);
 });
 
-// E.164: opsiyonel '+' ile baslar, ardindan 7-15 rakam.
-const PHONE_FORMAT_RE = /^\+?[0-9]{7,15}$/;
+// Tam bicim: +90, tek bosluk, 3 hane, bosluk, 3 hane, bosluk, 2 hane, bosluk, 2 hane.
+const PHONE_FORMAT_RE = /^\+90 \d{3} \d{3} \d{2} \d{2}$/;
 
 els.crPhoneContinueBtn.addEventListener('click', async () => {
   const telefon = els.crPhoneInput.value.trim();

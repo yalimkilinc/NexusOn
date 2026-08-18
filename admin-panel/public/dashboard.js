@@ -177,11 +177,15 @@ function buildSlideRow(slide, order) {
       </div>
       <div class="slide-card-foot">
         <span class="item-text"></span>
+        <button class="item-view" type="button" title="Gerçek boyutunda görüntüle">⛶</button>
         <button class="item-edit" type="button" title="Düzenle">✎</button>
         <button class="item-delete" type="button" title="Sil">✕</button>
       </div>
     `;
     card.querySelector('.item-text').textContent = slide.text;
+    card.querySelector('.item-view').addEventListener('click', () => {
+      if (slide.mediaUrl) window.open(slide.mediaUrl, '_blank');
+    });
     card.querySelector('.item-edit').addEventListener('click', renderEdit);
     card.querySelector('.item-delete').addEventListener('click', async () => {
       await api(`/admin/slides/${slide.id}`, { method: 'DELETE' });

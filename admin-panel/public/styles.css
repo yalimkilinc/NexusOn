@@ -192,6 +192,12 @@ html, body {
   flex-shrink: 0;
 }
 .item-edit:hover { background: #1a2440; }
+.item-view {
+  background: none; border: 1px solid var(--border); color: var(--text-dim);
+  width: 26px; height: 26px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  flex-shrink: 0;
+}
+.item-view:hover { background: #1e2230; color: var(--text); }
 .edit-text-row { flex: 1; min-width: 160px; margin-bottom: 0; }
 .edit-image { max-width: 200px; font-size: 12px; }
 .empty-hint { color: var(--text-dim); font-size: 12.5px; margin: 0 0 12px; }
