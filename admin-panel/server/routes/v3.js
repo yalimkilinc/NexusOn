@@ -3,7 +3,7 @@
 
 const express = require('express');
 const sql = require('mssql');
-const { requireAuth, requireAgentToken } = require('../middleware');
+const { requireAuth, requireFullAdmin, requireAgentToken } = require('../middleware');
 const v3db = require('../v3db');
 
 const router = express.Router();
@@ -40,7 +40,7 @@ router.get('/agent/v3-customers', requireAgentToken, async (req, res) => {
   }
 });
 
-router.get('/admin/v3-settings', requireAuth, (_req, res) => {
+router.get('/admin/v3-settings', requireAuth, requireFullAdmin, (_req, res) => {
   const s = v3db.getSettings();
   if (!s) return res.json(null);
   // Sifreyi oldugu gibi geri gondermiyoruz, sadece "ayarlanmis mi" bilgisini veriyoruz.
@@ -55,7 +55,7 @@ router.get('/admin/v3-settings', requireAuth, (_req, res) => {
   });
 });
 
-router.post('/admin/v3-settings', requireAuth, (req, res) => {
+router.post('/admin/v3-settings', requireAuth, requireFullAdmin, (req, res) => {
   const { host, port, databaseName, username, password, cariTable } = req.body || {};
   if (!host || !databaseName || !username) {
     return res.status(400).json({ error: 'Sunucu adresi, veritabanı adı ve kullanıcı adı gerekli.' });
@@ -64,7 +64,7 @@ router.post('/admin/v3-settings', requireAuth, (req, res) => {
   res.json({ ok: true, updatedAt: saved.updated_at });
 });
 
-router.post('/admin/v3-settings/test', requireAuth, async (_req, res) => {
+router.post('/admin/v3-settings/test', requireAuth, requireFullAdmin, async (_req, res) => {
   try {
     const pool = await v3db.connect();
     await pool.request().query('SELECT 1 AS ok');
@@ -76,7 +76,7 @@ router.post('/admin/v3-settings/test', requireAuth, async (_req, res) => {
 });
 
 // Cari tablosunu birlikte bulabilmek icin: veritabanindaki tum tablolari listele.
-router.get('/admin/v3-settings/tables', requireAuth, async (_req, res) => {
+router.get('/admin/v3-settings/tables', requireAuth, requireFullAdmin, async (_req, res) => {
   let pool;
   try {
     pool = await v3db.connect();
@@ -95,7 +95,7 @@ router.get('/admin/v3-settings/tables', requireAuth, async (_req, res) => {
 });
 
 // Secilen bir tablonun sutunlarini listele (cari tablosunu dogrulamak icin).
-router.get('/admin/v3-settings/columns', requireAuth, async (req, res) => {
+router.get('/admin/v3-settings/columns', requireAuth, requireFullAdmin, async (req, res) => {
   const table = String(req.query.table || '').trim();
   if (!table) return res.status(400).json({ error: 'Tablo adı gerekli.' });
 
@@ -124,7 +124,7 @@ router.get('/admin/v3-settings/columns', requireAuth, async (req, res) => {
 // parametre olarak vermeye izin vermez) siki bir bicim dogrulamasi yapiyoruz.
 const SAFE_IDENTIFIER = /^[A-Za-z0-9_]+$/;
 
-router.get('/admin/v3-settings/preview', requireAuth, async (req, res) => {
+router.get('/admin/v3-settings/preview', requireAuth, requireFullAdmin, async (req, res) => {
   const table = String(req.query.table || '').trim();
   if (!SAFE_IDENTIFIER.test(table)) {
     return res.status(400).json({ error: 'Geçersiz tablo adı.' });
@@ -143,7 +143,7 @@ router.get('/admin/v3-settings/preview', requireAuth, async (req, res) => {
 });
 
 // Musterinin verdigi ornek sorguyu dogrulamak icin gecici bir kontrol ucu.
-router.get('/admin/v3-settings/cari-check', requireAuth, async (_req, res) => {
+router.get('/admin/v3-settings/cari-check', requireAuth, requireFullAdmin, async (_req, res) => {
   let pool;
   try {
     pool = await v3db.connect();
@@ -166,7 +166,7 @@ router.get('/admin/v3-settings/cari-check', requireAuth, async (_req, res) => {
 
 // Nebim'in kendi tablolarina dokunmadan, V3'un AYNI veritabaninda NexusOn'ya
 // ait ayri bir tablo olusturur (yoksa). Idempotent: zaten varsa bir sey yapmaz.
-router.post('/admin/v3-settings/setup-table', requireAuth, async (_req, res) => {
+router.post('/admin/v3-settings/setup-table', requireAuth, requireFullAdmin, async (_req, res) => {
   try {
     await v3db.ensureTicketsTable();
     res.json({ ok: true, table: v3db.TICKETS_TABLE });

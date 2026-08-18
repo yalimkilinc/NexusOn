@@ -103,7 +103,7 @@ router.post('/public/customer/register', registerRateLimit, async (req, res) => 
             (@adSoyad, @telefon, @vergiNo, @cariKodu, @cariAdi, @passwordHash, SYSDATETIME(), SYSDATETIME())
         `);
 
-      res.json({ ok: true, cariKodu: match.cariKodu, cariAdi: match.cariAdi, adSoyad });
+      res.json({ ok: true, cariKodu: match.cariKodu, cariAdi: match.cariAdi, adSoyad, telefon });
     } finally {
       await pool.close();
     }
@@ -133,6 +133,7 @@ router.post('/public/customer/login', loginRateLimit, async (req, res) => {
         cariKodu: customer.CariKodu,
         cariAdi: customer.CariAdi,
         adSoyad: customer.AdSoyad,
+        telefon: customer.Telefon,
       });
     } finally {
       await pool.close();

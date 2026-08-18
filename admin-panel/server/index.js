@@ -61,9 +61,10 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 // eski bir surumu kurabilir. Indirilenler klasorundeki GUNCEL sabit dosya
 // adi (STABLE_EXE_NAME, bkz. routes/build.js) DISINDAKI her .exe istegini
 // her zaman guncel kuruluma yonlendiriyoruz - gelecekte adı değişse bile.
+const CURRENT_EXE_NAMES = ['NexusOn-Setup.exe', 'NexusOn-Personel-Setup.exe'];
 app.use('/download', (req, res, next) => {
   const requested = path.basename(req.path);
-  if (/\.exe$/i.test(requested) && requested !== 'NexusOn-Setup.exe') {
+  if (/\.exe$/i.test(requested) && !CURRENT_EXE_NAMES.includes(requested)) {
     return res.redirect(302, '/download/NexusOn-Setup.exe');
   }
   next();

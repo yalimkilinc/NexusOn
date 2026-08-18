@@ -125,18 +125,35 @@ db.exec(`
 `);
 
 // Var olan (eski) pending_connection_requests tablosunda telegram_message_id/
-// telegram_chat_id/note sutunlari olmayabilir (personel baglaninca Telegram
-// mesajinin durumunu guncelleyebilmek icin sonradan eklendi).
-for (const col of ['telegram_message_id', 'telegram_chat_id', 'note']) {
+// telegram_chat_id/note/telefon/ad_soyad sutunlari olmayabilir (personel
+// baglaninca Telegram mesajinin durumunu guncelleyebilmek icin, ve musteri
+// kayit/giris akisindan telefon/ad soyad'i bilete tasiyabilmek icin
+// sonradan eklendi).
+for (const col of ['telegram_message_id', 'telegram_chat_id', 'note', 'telefon', 'ad_soyad']) {
   const cols = db.prepare('PRAGMA table_info(pending_connection_requests)').all().map((c) => c.name);
   if (!cols.includes(col)) db.exec(`ALTER TABLE pending_connection_requests ADD COLUMN ${col} TEXT`);
 }
 
-// Var olan (eski) veritabani dosyalarinda tickets tablosu cari_kodu/cari_adi
-// sutunlari olmadan olusturulmus olabilir; sonradan ekle.
-for (const col of ['cari_kodu', 'cari_adi']) {
+// Var olan (eski) veritabani dosyalarinda tickets tablosu cari_kodu/cari_adi/
+// customer_phone/customer_full_name/requested_at sutunlari olmadan
+// olusturulmus olabilir; sonradan ekle. requested_at = musterinin destek
+// talebini ILK GONDERDIGI an (Baglanti Talebi Ilet akisindan geliyorsa) -
+// musteri dogrudan bir oda kodu paylasip personel manuel sectiyse bu ayri
+// bir "talep ani" olmadigindan started_at ile ayni deger yazilir (bkz.
+// routes/tickets.js).
+for (const col of ['cari_kodu', 'cari_adi', 'customer_phone', 'customer_full_name', 'requested_at']) {
   const cols = db.prepare('PRAGMA table_info(tickets)').all().map((c) => c.name);
   if (!cols.includes(col)) db.exec(`ALTER TABLE tickets ADD COLUMN ${col} TEXT`);
+}
+
+// Var olan (eski) admins tablosunda role sutunu olmayabilir; sonradan ekle.
+// 'admin' = her seye erisebilir, 'destek' = sadece Destek Kayitlari ve
+// Kurulum Dosyasi (indirme linkleri) sayfalarini gorebilir.
+{
+  const cols = db.prepare('PRAGMA table_info(admins)').all().map((c) => c.name);
+  if (!cols.includes('role')) {
+    db.exec("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'");
+  }
 }
 
 // Var olan (eski) email_settings tablosunda weekly_summary_enabled sutunu

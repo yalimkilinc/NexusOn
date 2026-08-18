@@ -1,13 +1,13 @@
 // E-posta (SMTP) ayarlari - yalnizca admin.
 
 const express = require('express');
-const { requireAuth } = require('../middleware');
+const { requireAuth, requireFullAdmin } = require('../middleware');
 const mailer = require('../mailer');
 const { runWeeklyCustomerSummary } = require('../weeklySummary');
 
 const router = express.Router();
 
-router.get('/admin/email-settings', requireAuth, (_req, res) => {
+router.get('/admin/email-settings', requireAuth, requireFullAdmin, (_req, res) => {
   const s = mailer.getSettings();
   if (!s) return res.json(null);
   // Sifreyi oldugu gibi geri gondermiyoruz, sadece "ayarlanmis mi" bilgisini veriyoruz.
@@ -24,7 +24,7 @@ router.get('/admin/email-settings', requireAuth, (_req, res) => {
   });
 });
 
-router.post('/admin/email-settings', requireAuth, (req, res) => {
+router.post('/admin/email-settings', requireAuth, requireFullAdmin, (req, res) => {
   const { smtpHost, smtpPort, smtpSecure, smtpUser, smtpPassword, fromAddress, recipients, weeklySummaryEnabled } = req.body || {};
   if (!smtpHost || !fromAddress) {
     return res.status(400).json({ error: 'SMTP sunucu adresi ve gönderen e-posta adresi gerekli.' });
@@ -42,7 +42,7 @@ router.post('/admin/email-settings', requireAuth, (req, res) => {
   res.json({ ok: true, updatedAt: saved.updated_at });
 });
 
-router.post('/admin/email-settings/send-weekly-now', requireAuth, async (_req, res) => {
+router.post('/admin/email-settings/send-weekly-now', requireAuth, requireFullAdmin, async (_req, res) => {
   try {
     const result = await runWeeklyCustomerSummary();
     res.json({ ok: true, ...result });
@@ -51,7 +51,7 @@ router.post('/admin/email-settings/send-weekly-now', requireAuth, async (_req, r
   }
 });
 
-router.post('/admin/email-settings/test', requireAuth, async (req, res) => {
+router.post('/admin/email-settings/test', requireAuth, requireFullAdmin, async (req, res) => {
   const to = (req.body && req.body.to) || mailer.getRecipientList()[0];
   if (!to) return res.status(400).json({ error: 'Test göndermek için bir alıcı e-posta adresi gerekli.' });
 

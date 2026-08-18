@@ -7,7 +7,7 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">Nexus<span>Go</span> Admin</div>
+    <div class="brand">Nexus<span>On</span> Admin</div>
     <div class="topbar-right">
       <span id="whoami"></span>
       <button id="logoutBtn" class="logout-btn">Çıkış Yap</button>
@@ -16,14 +16,15 @@
 
   <div class="dashboard-layout">
     <nav class="dashboard-nav">
-      <button class="nav-item active" data-page="slider">Görsel / Video Slider</button>
-      <button class="nav-item" data-page="news">Duyuru Metinleri</button>
-      <button class="nav-item" data-page="agents">Destek Personeli</button>
+      <button class="nav-item active" data-page="slider" data-roles="admin">Görsel / Video Slider</button>
+      <button class="nav-item" data-page="news" data-roles="admin">Duyuru Metinleri</button>
+      <button class="nav-item" data-page="agents" data-roles="admin">Destek Personeli</button>
       <button class="nav-item" data-page="tickets">Destek Kayıtları</button>
-      <button class="nav-item" data-page="v3">V3 Entegrasyonu</button>
-      <button class="nav-item" data-page="email">E-posta Ayarları</button>
-      <button class="nav-item" data-page="telegram">Telegram Bildirimleri</button>
+      <button class="nav-item" data-page="v3" data-roles="admin">V3 Entegrasyonu</button>
+      <button class="nav-item" data-page="email" data-roles="admin">E-posta Ayarları</button>
+      <button class="nav-item" data-page="telegram" data-roles="admin">Telegram Bildirimleri</button>
       <button class="nav-item" data-page="build">Kurulum Dosyası</button>
+      <button class="nav-item" data-page="admins" data-roles="admin">Panel Kullanıcıları</button>
     </nav>
 
     <main class="dashboard">
@@ -106,8 +107,8 @@
               <th>Tarih</th>
               <th>Personel</th>
               <th>Oda Kodu</th>
+              <th>Müşteri</th>
               <th>Müşteri Talebi</th>
-              <th>Tür</th>
               <th>Durum</th>
               <th>Süre</th>
               <th>Personel Notu</th>
@@ -232,19 +233,69 @@
 
     <section id="page-build" class="dashboard-page section-card hidden">
       <h2>Kurulum Dosyası</h2>
-      <p class="section-desc">
-        Güncel NexusOn kurulum dosyasını (.exe) yeniden derler. Bu işlem birkaç
-        dakika sürebilir ve panelin çalıştığı bilgisayarda Windows derleme
-        araçlarının kurulu olmasını gerektirir.
+      <p class="section-desc" data-roles="admin">
+        Güncel NexusOn kurulum dosyalarını (.exe) yeniden derler. Bu işlem
+        birkaç dakika sürebilir ve panelin çalıştığı bilgisayarda Windows
+        derleme araçlarının kurulu olmasını gerektirir. Müşteri ve personel
+        kurulumları ayrı dosyalardır, ayrı ayrı üretilir — sürüm numarasını
+        değiştirdiğinizde ikisini de yeniden üretmeyi unutmayın.
       </p>
-      <button id="buildBtn" class="primary-btn" style="width:auto; padding:10px 20px;">Yeni Kurulum Üret</button>
-      <div id="buildStatus" class="build-status"></div>
-      <div id="buildLog" class="build-log hidden"></div>
-      <a id="downloadLink" class="download-link hidden" href="#">İndir: kurulum dosyası hazır</a>
+
+      <div data-roles="admin">
+        <h3 style="margin:20px 0 8px; font-size:15px;">Müşteri Kurulumu</h3>
+        <button id="buildCustomerBtn" class="primary-btn" style="width:auto; padding:10px 20px;">Yeni Kurulum Üret</button>
+        <div id="buildCustomerStatus" class="build-status"></div>
+        <div id="buildCustomerLog" class="build-log hidden"></div>
+        <a id="downloadCustomerLink" class="download-link hidden" href="#">İndir: kurulum dosyası hazır</a>
+      </div>
       <p class="section-desc" style="margin-top:16px;">
-        Müşterilere/personele verilecek <strong>sabit indirme linki</strong> (her yeni derlemeden sonra otomatik güncellenir):<br />
-        <code>https://nexuson.abyazilim.com.tr:11086/download/NexusOn-Setup.exe</code>
+        Müşterilere verilecek <strong>sabit indirme linki</strong> (her yeni derlemeden sonra otomatik güncellenir):<br />
+        <code id="customerStableLink"></code>
       </p>
+
+      <div data-roles="admin" style="margin-top:24px; padding-top:20px; border-top:1px solid var(--border);">
+        <h3 style="margin:0 0 8px; font-size:15px;">Personel Kurulumu</h3>
+        <p class="section-desc">"Destek Vermek İçin" rolünü de içeren, sadece destek ekibine verilecek ayrı kurulum dosyası.</p>
+        <button id="buildStaffBtn" class="primary-btn" style="width:auto; padding:10px 20px;">Yeni Kurulum Üret</button>
+        <div id="buildStaffStatus" class="build-status"></div>
+        <div id="buildStaffLog" class="build-log hidden"></div>
+        <a id="downloadStaffLink" class="download-link hidden" href="#">İndir: kurulum dosyası hazır</a>
+      </div>
+      <p class="section-desc" style="margin-top:16px;">
+        Personele verilecek <strong>sabit indirme linki</strong> (bu linki sadece siz destek ekibine iletin, herkese açık paylaşmayın):<br />
+        <code id="staffStableLink"></code>
+      </p>
+    </section>
+
+    <section id="page-admins" class="dashboard-page section-card hidden" data-roles="admin">
+      <h2>Panel Kullanıcıları</h2>
+      <p class="section-desc">Bu admin paneline giriş yapabilecek hesaplar. "Yönetici" her sayfaya erişir; "Destek" rolü sadece Destek Kayıtları ve Kurulum Dosyası (indirme linkleri) sayfalarını görebilir.</p>
+      <div class="admin-list-row admin-list-header">
+        <span>Kullanıcı Adı</span>
+        <span>Rol</span>
+        <span></span>
+        <span></span>
+      </div>
+      <div id="adminList" class="item-list"></div>
+      <form id="adminForm" class="inline-form">
+        <div class="field-row">
+          <label>Kullanıcı Adı</label>
+          <input id="adminUsername" required placeholder="Örn: destek01" />
+        </div>
+        <div class="field-row">
+          <label>Rol</label>
+          <select id="adminRole">
+            <option value="destek">Destek (kısıtlı)</option>
+            <option value="admin">Yönetici (tam yetki)</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label>Parola</label>
+          <input id="adminPassword" type="text" required placeholder="Geçici bir şifre belirleyin" />
+        </div>
+        <button type="submit" id="adminSubmitBtn" class="primary-btn">Ekle</button>
+        <button type="button" id="adminCancelEditBtn" class="secondary-btn hidden">İptal</button>
+      </form>
     </section>
     </main>
   </div>

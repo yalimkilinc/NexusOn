@@ -50,6 +50,8 @@ router.post('/public/connection-request', connectionRequestRateLimit, async (req
   const cariKodu = String((req.body && req.body.cariKodu) || '').trim();
   const cariAdi = String((req.body && req.body.cariAdi) || '').trim();
   const note = String((req.body && req.body.note) || '').trim();
+  const telefon = String((req.body && req.body.telefon) || '').trim();
+  const adSoyad = String((req.body && req.body.adSoyad) || '').trim();
   if (!roomCode || !cariKodu || !cariAdi) {
     return res.status(400).json({ error: 'Oda kodu ve müşteri bilgisi gerekli.' });
   }
@@ -58,22 +60,30 @@ router.post('/public/connection-request', connectionRequestRateLimit, async (req
   // gonderim arka planda devam ediyor.
   res.json({ ok: true });
 
+  // ONEMLI: bu satir personel baglaninca (bkz. tickets.js /agent/tickets/start)
+  // musterinin telefon/ad soyad/orijinal talep zamanini bilete tasimanin TEK
+  // yolu - Telegram gonderimi basarisiz olsa bile (bot yanlis ayarlanmis,
+  // Telegram'a erisilemiyor vb.) bu kayit MUTLAKA olusmali. Once (Telegram'dan
+  // BAGIMSIZ) ekleyip, basarili olursa mesaj kimliklerini ayrica guncelliyoruz.
+  const insertInfo = db
+    .prepare(
+      'INSERT INTO pending_connection_requests (cari_kodu, cari_adi, room_code, note, telefon, ad_soyad) VALUES (?, ?, ?, ?, ?, ?)'
+    )
+    .run(cariKodu, cariAdi, roomCode, note || null, telefon || null, adSoyad || null);
+
   try {
     const keyboard = buildDeepLinkKeyboard(roomCode, cariKodu, cariAdi);
     const sent = await telegram.sendMessage(
       buildRequestMessage(cariAdi, roomCode, note, '⏳ Bekliyor (henüz destek personeli bağlanmadı)'),
       keyboard
     );
-    db.prepare(
-      'INSERT INTO pending_connection_requests (cari_kodu, cari_adi, room_code, telegram_message_id, telegram_chat_id, note) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(
-      cariKodu,
-      cariAdi,
-      roomCode,
-      sent?.result?.message_id ? String(sent.result.message_id) : null,
-      sent?.result?.chat?.id ? String(sent.result.chat.id) : null,
-      note || null
-    );
+    if (sent?.result?.message_id && sent?.result?.chat?.id) {
+      db.prepare('UPDATE pending_connection_requests SET telegram_message_id = ?, telegram_chat_id = ? WHERE id = ?').run(
+        String(sent.result.message_id),
+        String(sent.result.chat.id),
+        insertInfo.lastInsertRowid
+      );
+    }
   } catch (err) {
     console.error('Bağlantı talebi bildirimi gönderilemedi:', err.message);
   }

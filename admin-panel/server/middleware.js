@@ -5,6 +5,14 @@ function requireAuth(req, res, next) {
   res.status(401).json({ error: 'Giriş yapmanız gerekiyor.' });
 }
 
+// requireAuth'tan SONRA kullanilir: 'destek' rolundeki panel hesaplari sadece
+// Destek Kayitlari ve Kurulum Dosyasi (indirme linki) sayfalarina erisebilir;
+// geri kalan tum admin route'lari bunu da gerektirir.
+function requireFullAdmin(req, res, next) {
+  if (req.session && req.session.role === 'admin') return next();
+  res.status(403).json({ error: 'Bu işlem için yönetici yetkisi gerekiyor.' });
+}
+
 // NexusOn uygulamasi (file://) icin: cerez degil, "Authorization: Bearer <token>"
 // basligi kullanilir (capraz-kaynak cerez kisitlamalarindan etkilenmez).
 function requireAgentToken(req, res, next) {
@@ -17,4 +25,4 @@ function requireAgentToken(req, res, next) {
   next();
 }
 
-module.exports = { requireAuth, requireAgentToken };
+module.exports = { requireAuth, requireFullAdmin, requireAgentToken };

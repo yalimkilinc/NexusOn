@@ -10,6 +10,7 @@ const db = require('./db');
 
 const DATABASE_NAME = 'ABSupport';
 const CUSTOMERS_TABLE = 'NexusOn_Musteriler';
+const LOGS_TABLE = 'NexusOn_DestekLoglari';
 
 function getConnectionBase() {
   return db.prepare('SELECT host, port, username, password FROM v3_settings WHERE id = 1').get();
@@ -56,4 +57,38 @@ async function ensureCustomersTable() {
   }
 }
 
-module.exports = { connect, ensureCustomersTable, CUSTOMERS_TABLE, DATABASE_NAME };
+// Ortak raporlama icin destek gorusmesi (bilet) kayitlarinin ABSupport
+// kopyasi - NexusOn_Musteriler ile ayni veritabaninda, CariKodu uzerinden
+// eslesebilir. SQLite'taki `tickets` (asil/canli kaynak) ve V3'teki
+// NexusOn_DestekKayitlari (ayrica tutulan, onceden var olan bir gereksinim)
+// ile PARALEL, onlarin YERINE GECMEYEN bir kayit - biri basarisiz olsa
+// digerleri yine de yazilir.
+async function ensureLogsTable() {
+  const pool = await connect();
+  try {
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = '${LOGS_TABLE}')
+      CREATE TABLE ${LOGS_TABLE} (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        CariKodu NVARCHAR(50) NULL,
+        MusteriAdi NVARCHAR(255) NULL,
+        YetkiliAdSoyad NVARCHAR(200) NULL,
+        TelefonNumarasi NVARCHAR(30) NULL,
+        Talep NVARCHAR(MAX) NULL,
+        IstekSaati DATETIME2 NULL,
+        DestekPersoneli NVARCHAR(100) NOT NULL,
+        BaglantiBaslangicSaati DATETIME2 NOT NULL,
+        BaglantiBitisSaati DATETIME2 NULL,
+        SureSaniye INT NULL,
+        DestekSonucu NVARCHAR(50) NULL,
+        PersonelNotu NVARCHAR(MAX) NULL,
+        RoomCode NVARCHAR(20) NULL,
+        OlusturmaTarihi DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+      )
+    `);
+  } finally {
+    await pool.close();
+  }
+}
+
+module.exports = { connect, ensureCustomersTable, ensureLogsTable, CUSTOMERS_TABLE, LOGS_TABLE, DATABASE_NAME };

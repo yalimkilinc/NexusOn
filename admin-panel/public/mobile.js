@@ -39,7 +39,8 @@ const els = {
   fileInput: document.getElementById('fileInput'),
   transferList: document.getElementById('transferList'),
   closingOverlay: document.getElementById('closingOverlay'),
-  closingCategory: document.getElementById('closingCategory'),
+  closingCustomerRequestRow: document.getElementById('closingCustomerRequestRow'),
+  closingCustomerRequestText: document.getElementById('closingCustomerRequestText'),
   closingStatus: document.getElementById('closingStatus'),
   closingNote: document.getElementById('closingNote'),
   closingSaveBtn: document.getElementById('closingSaveBtn'),
@@ -387,18 +388,36 @@ async function startTicket() {
       }),
     });
     const data = await res.json();
-    if (res.ok) state.currentTicketId = data.ticketId;
+    if (res.ok) {
+      state.currentTicketId = data.ticketId;
+      state.ticketCustomerNote = data.customerNote || '';
+      state.ticketCustomerPhone = data.customerPhone || '';
+      state.ticketCustomerFullName = data.customerFullName || '';
+    }
   } catch {}
 }
 
 function showClosingForm(ticketId) {
   els.closingOverlay.dataset.ticketId = ticketId;
+
+  const noteParts = [];
+  if (state.ticketCustomerFullName || state.ticketCustomerPhone) {
+    noteParts.push([state.ticketCustomerFullName, state.ticketCustomerPhone].filter(Boolean).join(' — '));
+  }
+  if (state.ticketCustomerNote) noteParts.push(state.ticketCustomerNote);
+  if (noteParts.length) {
+    els.closingCustomerRequestText.textContent = noteParts.join(' · ');
+    els.closingCustomerRequestRow.classList.remove('hidden');
+  } else {
+    els.closingCustomerRequestText.textContent = '';
+    els.closingCustomerRequestRow.classList.add('hidden');
+  }
+
   els.closingOverlay.classList.remove('hidden');
 }
 
 els.closingSaveBtn.addEventListener('click', async () => {
   const ticketId = els.closingOverlay.dataset.ticketId;
-  const category = els.closingCategory.value;
   const status = els.closingStatus.value;
   const note = els.closingNote.value.trim();
 
@@ -407,7 +426,7 @@ els.closingSaveBtn.addEventListener('click', async () => {
     await fetch(`${API_BASE_URL}/api/agent/tickets/${ticketId}/end`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.agent?.token}` },
-      body: JSON.stringify({ category, status, note }),
+      body: JSON.stringify({ status, note }),
     });
   } catch {}
   els.closingSaveBtn.disabled = false;

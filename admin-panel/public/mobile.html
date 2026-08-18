@@ -12,7 +12,7 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">Nexus<span>Go</span></div>
+    <div class="brand">Nexus<span>On</span></div>
     <div id="statusBadge" class="status status-disconnected">Bağlı değil</div>
   </header>
 
@@ -92,14 +92,9 @@
   <div id="closingOverlay" class="modal-overlay hidden">
     <div class="modal-card">
       <h3>Görüşmeyi Kapat</h3>
-      <div class="field-row">
-        <label>Tür</label>
-        <select id="closingCategory">
-          <option value="hata">Hata</option>
-          <option value="sorun">Sorun</option>
-          <option value="istek">İstek</option>
-          <option value="gelistirme">Geliştirme Talebi</option>
-        </select>
+      <div id="closingCustomerRequestRow" class="field-row hidden">
+        <label>Müşterinin Talebi</label>
+        <p id="closingCustomerRequestText" class="hint"></p>
       </div>
       <div class="field-row">
         <label>Durum</label>

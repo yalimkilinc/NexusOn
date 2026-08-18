@@ -8,7 +8,6 @@ const db = require('./db');
 const v3db = require('./v3db');
 const mailer = require('./mailer');
 
-const CATEGORY_LABELS = { hata: 'Hata', sorun: 'Sorun', istek: 'İstek', gelistirme: 'Geliştirme Talebi' };
 const STATUS_LABELS = { cozuldu: 'Çözüldü', devam_ediyor: 'Devam Ediyor', yonlendirildi: 'Yönlendirildi' };
 
 function formatDuration(seconds) {
@@ -42,7 +41,6 @@ function buildSummaryHtml(cariAdi, tickets) {
       (t) => `
         <tr>
           <td>${t.started_at}</td>
-          <td>${CATEGORY_LABELS[t.category] || t.category || '—'}</td>
           <td>${STATUS_LABELS[t.status] || t.status || '—'}</td>
           <td>${formatDuration(t.duration_seconds)}</td>
         </tr>`
@@ -53,7 +51,7 @@ function buildSummaryHtml(cariAdi, tickets) {
     <h3>NexusOn - Haftalık Destek Özeti</h3>
     <p>Sayın ${cariAdi || 'yetkilisi'}, bu hafta tarafınıza sağlanan destek hizmetlerinin özeti aşağıdadır.</p>
     <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;">
-      <thead><tr><th>Tarih</th><th>Tür</th><th>Durum</th><th>Süre</th></tr></thead>
+      <thead><tr><th>Tarih</th><th>Durum</th><th>Süre</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;

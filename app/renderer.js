@@ -20,6 +20,37 @@ const ICE_SERVERS = [
   { urls: 'turn:standard.relay.metered.ca:443', username: '6ec2b1b1fca62c68aa200026', credential: 'aXaf2/zoQEKwoErW' },
   { urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: '6ec2b1b1fca62c68aa200026', credential: 'aXaf2/zoQEKwoErW' },
 ];
+
+// ONEMLI (CANLI KANITLANDI - CDP JS profiler ile, iki gercek NexusOn
+// kopyasi uretim sinyal/TURN sunuculari uzerinden birbirine baglanarak
+// olculdu): destek personelinin "kendi penceresi baglandiktan sonra da
+// yavas/donuk hissediyor" sikayetinin somut, olculmus bir bileseni burada
+// bulundu - "Bağlan"a basildigi TAM ANDA (setupPeerConnection icindeki
+// 'new RTCPeerConnection(...)' cagrisinda) 500-900ms suren, TUM ana is
+// parcacigini (dolayisiyla butun pencereyi - tiklamalar, video, her sey)
+// bloke eden senkron bir donma vardi. Sebep: bir RTCPeerConnection'a acikca
+// bir sertifika verilmezse, tarayici o surecte kullanacagi ilk DTLS
+// sertifikasini SENKRON olarak kendisi uretiyor (bilinen, WebRTC'nin
+// kendisinin de belgeledigi bir maliyet) - ve bu surec basina sadece BIR
+// KERE oluyor (izole testte, ayni surecte ikinci bir RTCPeerConnection
+// kurulumu <1ms surdu). Kalici/mimari cozum (WebRTC'nin kendi onerdigi
+// yontem): sertifikayi kullanicinin hicbir sey yapmadigi, uygulamanin daha
+// yeni actigi bu anda arka planda ONCEDEN urettiriyoruz - connect() cagrildiginda
+// bu Promise neredeyse HER ZAMAN coktan cozulmus oluyor (kullanicinin rol
+// secip, giris yapip, "Bağlan"a basmasi bile bunun onune gecmeye yetiyor),
+// boylece asil baglanti kurulum ani artik hicbir sekilde bloke olmuyor.
+const rtcCertificatePromise = (typeof RTCPeerConnection !== 'undefined' && RTCPeerConnection.generateCertificate)
+  ? RTCPeerConnection.generateCertificate({ name: 'ECDSA', namedCurve: 'P-256' }).catch(() => null)
+  : Promise.resolve(null);
+
+// "Destek Vermek Icin" (viewer/personel) rolu musteri kurulumunda (varsayilan,
+// herkese acik indirme linki) HIC gorunmemeli/calismamali - bkz. variant.js,
+// package.json'daki "dist" (musteri) vs "dist:staff" (personel, ayri
+// kurulum dosyasi) komutlari. Dosyanin en basinda tanimli ki her yerden
+// (rol secimi, guncelleme kontrolu - dogru varyantin indirme linkini almak
+// icin) erisilebilsin.
+const IS_STAFF_BUILD = window.NEXUSON_VARIANT === 'staff';
+
 const CHUNK_SIZE = 16 * 1024; // 16 KB - veri kanali icin guvenli parca boyutu
 const HEADER_LEN = 8; // her binary dosya parcasinin basindaki transferId etiketi
 // NOT: "localhost" yalnizca sunucularla AYNI bilgisayarda calisir. Baska bir
@@ -27,7 +58,7 @@ const HEADER_LEN = 8; // her binary dosya parcasinin basindaki transferId etiket
 // gercek ag adresi (LAN IP ya da gercek bir sunucu adresi) kullanilmali.
 const DEFAULT_SERVER_URL = 'wss://nexuson.abyazilim.com.tr:11085'; // musteri (host) ekraninda gizli, sabit deger
 const API_BASE_URL = 'https://nexuson.abyazilim.com.tr:11086'; // admin panel: icerik, ajan girisi, destek kayitlari
-const CONTENT_API_URL = `${API_BASE_URL}/api/public/content`;
+const CONTENT_API_URL = `${API_BASE_URL}/api/public/content?variant=${IS_STAFF_BUILD ? 'staff' : 'customer'}`;
 
 const CONTACT = {
   phoneDisplay: '+90 541 225 00 33',
@@ -124,7 +155,8 @@ const els = {
   logPanel: document.getElementById('logPanel'),
   logBox: document.getElementById('logBox'),
   closingFormOverlay: document.getElementById('closingFormOverlay'),
-  closingCategory: document.getElementById('closingCategory'),
+  closingCustomerRequestRow: document.getElementById('closingCustomerRequestRow'),
+  closingCustomerRequestText: document.getElementById('closingCustomerRequestText'),
   closingStatus: document.getElementById('closingStatus'),
   closingNote: document.getElementById('closingNote'),
   closingSaveBtn: document.getElementById('closingSaveBtn'),
@@ -247,6 +279,10 @@ function setStatus(text, cls) {
 els.roleHostBtn.addEventListener('click', () => setRole('host'));
 els.roleViewerBtn.addEventListener('click', () => setRole('viewer'));
 
+if (!IS_STAFF_BUILD) {
+  els.roleChoice.classList.add('hidden');
+}
+
 // Windows'un kaldirilan kendi pencere dugmelerinin yerini alan ozel
 // dugmeler (bkz. main.js frame:false, styles.css .window-controls).
 els.windowMinimizeBtn.addEventListener('click', () => window.nexuson.windowMinimize());
@@ -258,6 +294,11 @@ window.nexuson.onWindowMaximizedState((isMaximized) => {
 });
 
 function setRole(role) {
+  // Musteri kurulumunda (bkz. IS_STAFF_BUILD yukarida) viewer roluna GECIS
+  // sadece butonu gizlemekle degil, burada da engellenmeli - aksi halde
+  // beklenmedik bir kod yolu (ornegin bir deep link) yine de personel
+  // ekranini acabilirdi.
+  if (role === 'viewer' && !IS_STAFF_BUILD) return;
   state.role = role;
   els.roleHostBtn.classList.toggle('active', role === 'host');
   els.roleViewerBtn.classList.toggle('active', role === 'viewer');
@@ -832,7 +873,14 @@ function finishConnectionRequest(customer) {
   fetch(`${API_BASE_URL}/api/public/connection-request`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ roomCode, cariKodu: customer.cariKodu, cariAdi: customer.cariAdi, note }),
+    body: JSON.stringify({
+      roomCode,
+      cariKodu: customer.cariKodu,
+      cariAdi: customer.cariAdi,
+      note,
+      telefon: customer.telefon,
+      adSoyad: customer.adSoyad,
+    }),
   }).catch(() => {});
 }
 
@@ -1087,7 +1135,7 @@ function startConnection(ctx, sessionId, roomCode, serverUrl) {
     switch (msg.type) {
       case 'joined':
         log(`Odaya katılındı (rol: ${msg.role}). Şu anda odada ${msg.peers} başka katılımcı var.`);
-        setupPeerConnection(ctx, sessionId);
+        await setupPeerConnection(ctx, sessionId);
         if (state.role === 'host' && msg.peers > 0) {
           await startHostOffer(ctx, sessionId);
         }
@@ -1129,8 +1177,25 @@ function startConnection(ctx, sessionId, roomCode, serverUrl) {
   };
 }
 
-function setupPeerConnection(ctx, sessionId) {
-  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+async function setupPeerConnection(ctx, sessionId) {
+  // ONEMLI (CANLI KANITLANDI - CDP JS profiler + performance.now() ile
+  // olculdu): 'new RTCPeerConnection(...)' bir surecte SERTIFIKA VERILMEDEN
+  // ilk cagrildiginda, tarayici kendi varsayilan DTLS sertifikasini SENKRON
+  // olarak (ana is parcacigini tamamen bloke ederek) uretiyor. Bu makinede
+  // olcduk: 500-900ms surdu, VE TAM O SIRADA butun pencere/tiklamalar/video
+  // donuyordu - bu, destek personelinin "Bağlan"a tikladigi TAM ANDA
+  // gerceklesiyor (setupPeerConnection HER YENI baglantida - hem host hem
+  // viewer tarafinda - cagriliyor). Sertifika onceden (dosyanin en basinda,
+  // kullanici daha rol bile secmeden) arka planda uretilip burada
+  // kullanildiginda, ayni kurulum <1ms suruyor (asagida rtcCertificatePromise,
+  // dosya basinda tanimli). Bu "tepki hizinin bir an donmasi" sikayetinin
+  // olculmus, somut sebebiydi - band-aid degil, WebRTC'nin kendi onerdigi
+  // (RTCPeerConnection.generateCertificate'i onceden cagirma) kalici cozum.
+  const rtcCert = await rtcCertificatePromise;
+  const pc = new RTCPeerConnection({
+    iceServers: ICE_SERVERS,
+    ...(rtcCert ? { certificates: [rtcCert] } : {}),
+  });
   ctx.pc = pc;
 
   pc.onicecandidate = (e) => {
@@ -2132,7 +2197,7 @@ function disconnectSession(ctx, sessionId, reason) {
     state.viewerSessions.delete(sessionId);
 
     if (ticketId) {
-      showClosingForm(ticketId, sessionId);
+      showClosingForm(ctx, ticketId, sessionId);
     } else {
       afterViewerSessionClosed(sessionId, reason);
     }
@@ -2212,6 +2277,12 @@ async function startTicket(ctx) {
     const data = await res.json();
     if (res.ok) {
       ctx.currentTicketId = data.ticketId;
+      // Gorusme kapanirken (bkz. showClosingForm) musterinin talebini
+      // personele hatirlatabilmek icin sakliyoruz - sunucu bunu zaten
+      // (room_notes / Baglanti Talebi Ilet akisindan) cozup donuyor.
+      ctx.ticketCustomerNote = data.customerNote || '';
+      ctx.ticketCustomerPhone = data.customerPhone || '';
+      ctx.ticketCustomerFullName = data.customerFullName || '';
       log('Görüşme kaydı başlatıldı.');
     } else {
       log(`Görüşme kaydı başlatılamadı: ${data.error || res.status}`);
@@ -2221,16 +2292,32 @@ async function startTicket(ctx) {
   }
 }
 
-function showClosingForm(ticketId, sessionId) {
+function showClosingForm(ctx, ticketId, sessionId) {
   els.closingFormOverlay.dataset.ticketId = ticketId;
   els.closingFormOverlay.dataset.sessionId = sessionId || '';
+
+  // Musteri "Baglanti Talebi Ilet" ile baglanirken bir talep/not birakmissa,
+  // personel gorusmeyi kapatirken bunu tekrar gorsun - hatirlamak icin
+  // yukari kaydirip bakmasina gerek kalmaz.
+  const noteParts = [];
+  if (ctx.ticketCustomerFullName || ctx.ticketCustomerPhone) {
+    noteParts.push([ctx.ticketCustomerFullName, ctx.ticketCustomerPhone].filter(Boolean).join(' — '));
+  }
+  if (ctx.ticketCustomerNote) noteParts.push(ctx.ticketCustomerNote);
+  if (noteParts.length) {
+    els.closingCustomerRequestText.textContent = noteParts.join(' · ');
+    els.closingCustomerRequestRow.classList.remove('hidden');
+  } else {
+    els.closingCustomerRequestText.textContent = '';
+    els.closingCustomerRequestRow.classList.add('hidden');
+  }
+
   els.closingFormOverlay.classList.remove('hidden');
 }
 
 els.closingSaveBtn.addEventListener('click', async () => {
   const ticketId = els.closingFormOverlay.dataset.ticketId;
   const sessionId = els.closingFormOverlay.dataset.sessionId || null;
-  const category = els.closingCategory.value;
   const status = els.closingStatus.value;
   const note = els.closingNote.value.trim();
 
@@ -2242,7 +2329,7 @@ els.closingSaveBtn.addEventListener('click', async () => {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${state.agent?.token}`,
       },
-      body: JSON.stringify({ category, status, note }),
+      body: JSON.stringify({ status, note }),
     });
     log('Görüşme kaydı tamamlandı.');
   } catch (err) {

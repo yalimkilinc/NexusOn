@@ -5,7 +5,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
-const { requireAuth, requireAgentToken } = require('../middleware');
+const { requireAuth, requireFullAdmin, requireAgentToken } = require('../middleware');
 const { createToken, revokeToken } = require('../agentTokens');
 const { createRateLimiter } = require('../rateLimiter');
 
@@ -70,14 +70,14 @@ router.post('/agent/change-password', requireAgentToken, (req, res) => {
 
 // --------------------------- Admin: ajan yonetimi ---------------------------
 
-router.get('/admin/agents', requireAuth, (_req, res) => {
+router.get('/admin/agents', requireAuth, requireFullAdmin, (_req, res) => {
   const agents = db
     .prepare('SELECT id, username, full_name, phone, email, created_at FROM agents ORDER BY username ASC')
     .all();
   res.json(agents);
 });
 
-router.post('/admin/agents', requireAuth, (req, res) => {
+router.post('/admin/agents', requireAuth, requireFullAdmin, (req, res) => {
   const { username, fullName, phone, email, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ error: 'Kullanıcı kodu ve şifre gerekli.' });
@@ -93,7 +93,7 @@ router.post('/admin/agents', requireAuth, (req, res) => {
   res.json({ id: info.lastInsertRowid, username, fullName, phone, email });
 });
 
-router.put('/admin/agents/:id', requireAuth, (req, res) => {
+router.put('/admin/agents/:id', requireAuth, requireFullAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM agents WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Bulunamadı.' });
 
@@ -112,7 +112,7 @@ router.put('/admin/agents/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/admin/agents/:id', requireAuth, (req, res) => {
+router.delete('/admin/agents/:id', requireAuth, requireFullAdmin, (req, res) => {
   const info = db.prepare('DELETE FROM agents WHERE id = ?').run(req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: 'Bulunamadı.' });
   res.json({ ok: true });

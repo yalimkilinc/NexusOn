@@ -10,10 +10,23 @@ const els = {
   newsList: document.getElementById('newsList'),
   newsForm: document.getElementById('newsForm'),
   newsText: document.getElementById('newsText'),
-  buildBtn: document.getElementById('buildBtn'),
-  buildStatus: document.getElementById('buildStatus'),
-  buildLog: document.getElementById('buildLog'),
-  downloadLink: document.getElementById('downloadLink'),
+  buildCustomerBtn: document.getElementById('buildCustomerBtn'),
+  buildCustomerStatus: document.getElementById('buildCustomerStatus'),
+  buildCustomerLog: document.getElementById('buildCustomerLog'),
+  downloadCustomerLink: document.getElementById('downloadCustomerLink'),
+  buildStaffBtn: document.getElementById('buildStaffBtn'),
+  buildStaffStatus: document.getElementById('buildStaffStatus'),
+  buildStaffLog: document.getElementById('buildStaffLog'),
+  downloadStaffLink: document.getElementById('downloadStaffLink'),
+  customerStableLink: document.getElementById('customerStableLink'),
+  staffStableLink: document.getElementById('staffStableLink'),
+  adminList: document.getElementById('adminList'),
+  adminForm: document.getElementById('adminForm'),
+  adminUsername: document.getElementById('adminUsername'),
+  adminRole: document.getElementById('adminRole'),
+  adminPassword: document.getElementById('adminPassword'),
+  adminSubmitBtn: document.getElementById('adminSubmitBtn'),
+  adminCancelEditBtn: document.getElementById('adminCancelEditBtn'),
   agentList: document.getElementById('agentList'),
   agentForm: document.getElementById('agentForm'),
   agentUsername: document.getElementById('agentUsername'),
@@ -60,7 +73,8 @@ const els = {
   telegramTestResult: document.getElementById('telegramTestResult'),
 };
 
-let buildPollTimer = null;
+const buildPollTimers = { customer: null, staff: null };
+let currentRole = null;
 
 async function api(path, options) {
   const res = await fetch(`/api${path}`, {
@@ -86,16 +100,39 @@ async function init() {
     window.location.href = 'login.html';
     return;
   }
+  currentRole = session.role;
   els.whoami.textContent = session.username;
 
-  loadSlides();
-  loadNews();
-  loadAgents();
+  els.customerStableLink.textContent = `${location.origin}/download/NexusOn-Setup.exe`;
+  els.staffStableLink.textContent = `${location.origin}/download/NexusOn-Personel-Setup.exe`;
+
+  const isFullAdmin = currentRole === 'admin';
+  document.querySelectorAll('[data-roles="admin"]').forEach((el) => {
+    el.classList.toggle('hidden', !isFullAdmin);
+  });
+
+  // 'destek' rolu icin varsayilan sekme "Görsel / Video Slider" (gizli)
+  // yerine goruntuleyebildigi ilk sekme olan "Destek Kayıtları" olsun.
+  if (!isFullAdmin) {
+    document.querySelectorAll('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.page === 'tickets'));
+    document.querySelectorAll('.dashboard-page').forEach((page) => {
+      page.classList.toggle('hidden', page.id !== 'page-tickets');
+    });
+  }
+
   loadTickets();
-  loadV3Settings();
-  loadEmailSettings();
-  loadTelegramSettings();
-  pollBuildStatus();
+
+  if (isFullAdmin) {
+    loadSlides();
+    loadNews();
+    loadAgents();
+    loadV3Settings();
+    loadEmailSettings();
+    loadTelegramSettings();
+    loadAdmins();
+    pollBuildStatus('customer');
+    pollBuildStatus('staff');
+  }
 }
 
 els.logoutBtn.addEventListener('click', async () => {
@@ -318,7 +355,6 @@ els.agentForm.addEventListener('submit', async (e) => {
 
 // --------------------------- Destek kayitlari (biletler) ---------------------------
 
-const CATEGORY_LABELS = { hata: 'Hata', sorun: 'Sorun', istek: 'İstek', gelistirme: 'Geliştirme Talebi' };
 const STATUS_LABELS = { cozuldu: 'Çözüldü', devam_ediyor: 'Devam Ediyor', yonlendirildi: 'Yönlendirildi' };
 
 function formatDuration(seconds) {
@@ -387,12 +423,13 @@ function renderTicketTable(tickets) {
       <td></td>
       <td><button type="button" class="link-btn danger ticket-delete-btn">Sil</button></td>
     `;
+    const customerLabel = [t.cari_adi, t.customer_full_name, t.customer_phone].filter(Boolean).join(' / ');
     const cells = row.querySelectorAll('td');
     cells[0].textContent = t.started_at;
     cells[1].textContent = t.agent_username;
     cells[2].textContent = t.room_code;
-    cells[3].textContent = t.customer_note || '—';
-    cells[4].textContent = t.category ? CATEGORY_LABELS[t.category] || t.category : '—';
+    cells[3].textContent = customerLabel || '—';
+    cells[4].textContent = t.customer_note || '—';
     cells[6].textContent = formatDuration(t.duration_seconds);
     cells[7].textContent = t.note || '—';
     row.querySelector('.ticket-delete-btn').addEventListener('click', () => deleteTicket(t.id));
@@ -621,52 +658,159 @@ els.telegramTestBtn.addEventListener('click', async () => {
 
 // --------------------------- Kurulum uretme ---------------------------
 
-els.buildBtn.addEventListener('click', async () => {
+const buildEls = {
+  customer: {
+    btn: els.buildCustomerBtn,
+    status: els.buildCustomerStatus,
+    log: els.buildCustomerLog,
+    downloadLink: els.downloadCustomerLink,
+  },
+  staff: {
+    btn: els.buildStaffBtn,
+    status: els.buildStaffStatus,
+    log: els.buildStaffLog,
+    downloadLink: els.downloadStaffLink,
+  },
+};
+
+els.buildCustomerBtn.addEventListener('click', () => triggerBuild('customer'));
+els.buildStaffBtn.addEventListener('click', () => triggerBuild('staff'));
+
+async function triggerBuild(variant) {
   try {
-    await api('/admin/build', { method: 'POST' });
-    pollBuildStatus(true);
+    await api(`/admin/build/${variant}`, { method: 'POST' });
+    pollBuildStatus(variant);
   } catch (err) {
     alert(err.message);
   }
-});
+}
 
-async function pollBuildStatus(justStarted) {
-  const state = await api('/admin/build/status');
-  renderBuildStatus(state);
+async function pollBuildStatus(variant) {
+  const state = await api(`/admin/build/${variant}/status`);
+  renderBuildStatus(variant, state);
 
+  const timers = buildPollTimers;
   if (state.status === 'running') {
-    els.buildBtn.disabled = true;
-    if (buildPollTimer) clearTimeout(buildPollTimer);
-    buildPollTimer = setTimeout(() => pollBuildStatus(), 2000);
+    buildEls[variant].btn.disabled = true;
+    if (timers[variant]) clearTimeout(timers[variant]);
+    timers[variant] = setTimeout(() => pollBuildStatus(variant), 2000);
   } else {
-    els.buildBtn.disabled = false;
-    if (buildPollTimer) clearTimeout(buildPollTimer);
+    buildEls[variant].btn.disabled = false;
+    if (timers[variant]) clearTimeout(timers[variant]);
   }
 }
 
-function renderBuildStatus(state) {
+function renderBuildStatus(variant, state) {
   const labels = {
     idle: 'Henüz kurulum üretilmedi.',
     running: 'Kurulum üretiliyor, lütfen bekleyin...',
     success: 'Kurulum başarıyla üretildi.',
     error: 'Kurulum üretilirken bir hata oluştu.',
   };
-  els.buildStatus.textContent = labels[state.status] || '';
-  els.buildStatus.className = `build-status status-${state.status}`;
+  const ui = buildEls[variant];
+  ui.status.textContent = labels[state.status] || '';
+  ui.status.className = `build-status status-${state.status}`;
 
   if (state.log) {
-    els.buildLog.textContent = state.log;
-    els.buildLog.classList.remove('hidden');
-    els.buildLog.scrollTop = els.buildLog.scrollHeight;
+    ui.log.textContent = state.log;
+    ui.log.classList.remove('hidden');
+    ui.log.scrollTop = ui.log.scrollHeight;
   }
 
   if (state.status === 'success' && state.exeFile) {
-    els.downloadLink.href = '/api/admin/build/download';
-    els.downloadLink.classList.remove('hidden');
+    ui.downloadLink.href = `/api/admin/build/${variant}/download`;
+    ui.downloadLink.classList.remove('hidden');
   } else {
-    els.downloadLink.classList.add('hidden');
+    ui.downloadLink.classList.add('hidden');
   }
 }
+
+// --------------------------- Panel kullanicilari ---------------------------
+
+let editingAdminId = null;
+let adminsCache = [];
+const ADMIN_ROLE_LABELS = { admin: 'Yönetici', destek: 'Destek (kısıtlı)' };
+
+async function loadAdmins() {
+  const admins = await api('/admin/admins');
+  adminsCache = admins;
+  els.adminList.innerHTML = '';
+
+  if (admins.length === 0) {
+    els.adminList.innerHTML = '<p class="empty-hint">Henüz başka panel kullanıcısı eklenmedi.</p>';
+    return;
+  }
+
+  for (const admin of admins) {
+    const row = document.createElement('div');
+    row.className = 'item-row admin-list-row';
+    row.innerHTML = `
+      <span class="item-text"></span>
+      <span class="item-text"></span>
+      <button class="link-btn" type="button" style="margin-top:0;">Düzenle</button>
+      <button class="item-delete" type="button" title="Sil">✕</button>
+    `;
+    const cells = row.querySelectorAll('.item-text');
+    cells[0].textContent = admin.username;
+    cells[1].textContent = ADMIN_ROLE_LABELS[admin.role] || admin.role;
+    row.querySelector('.link-btn').addEventListener('click', () => startEditAdmin(admin.id));
+    row.querySelector('.item-delete').addEventListener('click', async () => {
+      if (!confirm(`"${admin.username}" panel hesabını silmek istediğinize emin misiniz?`)) return;
+      try {
+        await api(`/admin/admins/${admin.id}`, { method: 'DELETE' });
+        if (editingAdminId === admin.id) cancelEditAdmin();
+        loadAdmins();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+    els.adminList.appendChild(row);
+  }
+}
+
+function startEditAdmin(id) {
+  const admin = adminsCache.find((a) => a.id === id);
+  if (!admin) return;
+  editingAdminId = id;
+  els.adminUsername.value = admin.username;
+  els.adminRole.value = admin.role;
+  els.adminPassword.value = '';
+  els.adminPassword.required = false;
+  els.adminPassword.placeholder = 'Değiştirmek istemiyorsanız boş bırakın';
+  els.adminSubmitBtn.textContent = 'Güncelle';
+  els.adminCancelEditBtn.classList.remove('hidden');
+}
+
+function cancelEditAdmin() {
+  editingAdminId = null;
+  els.adminForm.reset();
+  els.adminPassword.required = true;
+  els.adminPassword.placeholder = 'Geçici bir şifre belirleyin';
+  els.adminSubmitBtn.textContent = 'Ekle';
+  els.adminCancelEditBtn.classList.add('hidden');
+}
+
+els.adminCancelEditBtn.addEventListener('click', cancelEditAdmin);
+
+els.adminForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    username: els.adminUsername.value.trim(),
+    role: els.adminRole.value,
+    password: els.adminPassword.value,
+  };
+  try {
+    if (editingAdminId) {
+      await api(`/admin/admins/${editingAdminId}`, { method: 'PUT', body: JSON.stringify(payload) });
+    } else {
+      await api('/admin/admins', { method: 'POST', body: JSON.stringify(payload) });
+    }
+    cancelEditAdmin();
+    loadAdmins();
+  } catch (err) {
+    alert(err.message);
+  }
+});
 
 // --------------------------- Sayfa gecisleri (yan menu) ---------------------------
 

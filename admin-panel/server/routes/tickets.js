@@ -5,17 +5,16 @@ const express = require('express');
 const sql = require('mssql');
 const db = require('../db');
 const v3db = require('../v3db');
+const absupport = require('../absupport');
 const mailer = require('../mailer');
 const telegram = require('../telegram');
 const { buildRequestMessage, buildDeepLinkKeyboard } = require('./connection');
-const { requireAuth, requireAgentToken } = require('../middleware');
+const { requireAuth, requireFullAdmin, requireAgentToken } = require('../middleware');
 
 const router = express.Router();
 
-const VALID_CATEGORIES = ['hata', 'sorun', 'istek', 'gelistirme'];
 const VALID_STATUSES = ['cozuldu', 'devam_ediyor', 'yonlendirildi'];
 
-const CATEGORY_LABELS = { hata: 'Hata', sorun: 'Sorun', istek: 'İstek', gelistirme: 'Geliştirme Talebi' };
 const STATUS_LABELS = { cozuldu: 'Çözüldü', devam_ediyor: 'Devam Ediyor', yonlendirildi: 'Yönlendirildi' };
 
 function formatDuration(seconds) {
@@ -27,7 +26,7 @@ function formatDuration(seconds) {
 // Bilet kapaninca yetkililere bilgilendirme maili gonderir. Bu adim
 // basarisiz olsa bile (SMTP ayari girilmemis, sunucu erisilemez vb.)
 // ajanin akisini kesmez, sadece loglanir.
-async function notifyTicketClosed(ticket, { category, note, status, durationSeconds }) {
+async function notifyTicketClosed(ticket, { note, status, durationSeconds }) {
   const recipients = mailer.getRecipientList();
   if (recipients.length === 0) return;
 
@@ -36,7 +35,6 @@ async function notifyTicketClosed(ticket, { category, note, status, durationSeco
     <p><b>Personel:</b> ${ticket.agent_username}</p>
     <p><b>Müşteri:</b> ${ticket.cari_adi || '—'} (${ticket.cari_kodu || '—'})</p>
     <p><b>Oda Kodu:</b> ${ticket.room_code}</p>
-    <p><b>Tür:</b> ${CATEGORY_LABELS[category] || category}</p>
     <p><b>Durum:</b> ${STATUS_LABELS[status] || status}</p>
     <p><b>Süre:</b> ${formatDuration(durationSeconds)}</p>
     <p><b>Müşteri Talebi:</b> ${ticket.customer_note || '—'}</p>
@@ -76,21 +74,44 @@ router.post('/agent/tickets/start', requireAgentToken, (req, res) => {
 
   const roomNote = db.prepare('SELECT note FROM room_notes WHERE room_code = ?').get(roomCode);
 
-  const info = db
-    .prepare(
-      'INSERT INTO tickets (agent_id, agent_username, room_code, cari_kodu, cari_adi, customer_note) VALUES (?, ?, ?, ?, ?, ?)'
-    )
-    .run(req.agent.agentId, req.agent.username, roomCode, cariKodu, cariAdi, roomNote ? roomNote.note : null);
-
-  if (roomNote) db.prepare('DELETE FROM room_notes WHERE room_code = ?').run(roomCode);
-
   // "Bağlantı Talebi İlet" ile gelmis bir talep bu roomCode'a karsilik
-  // geliyorsa, Telegram'daki orijinal mesajin durumunu "beklıyor"dan
-  // "bağlanıldı"ya guncelle - musteri Telegram tarafinda hicbir sey
-  // gormedigi icin bu SADECE destek ekibinin gordugu mesajda degisir.
+  // geliyorsa (musteri telefonla giris/kayit olup baglanmis), telefon/ad
+  // soyad/ORIJINAL talep zamanini da buradan aliyoruz - musteri sadece bir
+  // oda kodu paylasip personel onu manuel V3'ten sectiyse boyle bir kayit
+  // hic olmaz, o durumda bu alanlar bos kalir ve "talep zamani" olarak
+  // biletin kendi baslangic ani (simdi) kullanilir.
   const pendingRequest = db
     .prepare('SELECT * FROM pending_connection_requests WHERE room_code = ?')
     .get(roomCode);
+
+  const customerNote = roomNote ? roomNote.note : pendingRequest ? pendingRequest.note : null;
+  const customerPhone = pendingRequest ? pendingRequest.telefon : null;
+  const customerFullName = pendingRequest ? pendingRequest.ad_soyad : null;
+  const requestedAt = pendingRequest ? pendingRequest.created_at : null;
+
+  const info = db
+    .prepare(
+      `INSERT INTO tickets
+        (agent_id, agent_username, room_code, cari_kodu, cari_adi, customer_note, customer_phone, customer_full_name, requested_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`
+    )
+    .run(
+      req.agent.agentId,
+      req.agent.username,
+      roomCode,
+      cariKodu,
+      cariAdi,
+      customerNote,
+      customerPhone,
+      customerFullName,
+      requestedAt
+    );
+
+  if (roomNote) db.prepare('DELETE FROM room_notes WHERE room_code = ?').run(roomCode);
+
+  // Telegram'daki orijinal mesajin durumunu "beklıyor"dan "bağlanıldı"ya
+  // guncelle - musteri Telegram tarafinda hicbir sey gormedigi icin bu
+  // SADECE destek ekibinin gordugu mesajda degisir.
   if (pendingRequest) {
     db.prepare('DELETE FROM pending_connection_requests WHERE id = ?').run(pendingRequest.id);
     if (pendingRequest.telegram_message_id && pendingRequest.telegram_chat_id) {
@@ -107,12 +128,16 @@ router.post('/agent/tickets/start', requireAgentToken, (req, res) => {
     }
   }
 
-  res.json({ ticketId: info.lastInsertRowid });
+  res.json({
+    ticketId: info.lastInsertRowid,
+    customerNote,
+    customerPhone,
+    customerFullName,
+  });
 });
 
 router.post('/agent/tickets/:id/end', requireAgentToken, async (req, res) => {
-  const { category, note, status } = req.body || {};
-  if (!VALID_CATEGORIES.includes(category)) return res.status(400).json({ error: 'Geçersiz tür.' });
+  const { note, status } = req.body || {};
   if (!VALID_STATUSES.includes(status)) return res.status(400).json({ error: 'Geçersiz durum.' });
 
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ? AND agent_id = ?').get(req.params.id, req.agent.agentId);
@@ -120,10 +145,11 @@ router.post('/agent/tickets/:id/end', requireAgentToken, async (req, res) => {
 
   const startedMs = new Date(ticket.started_at + 'Z').getTime();
   const durationSeconds = Math.max(0, Math.round((Date.now() - startedMs) / 1000));
+  const endedAtIso = new Date().toISOString();
 
   db.prepare(
-    `UPDATE tickets SET category = ?, note = ?, status = ?, ended_at = datetime('now'), duration_seconds = ? WHERE id = ?`
-  ).run(category, note || '', status, durationSeconds, req.params.id);
+    `UPDATE tickets SET note = ?, status = ?, ended_at = datetime('now'), duration_seconds = ? WHERE id = ?`
+  ).run(note || '', status, durationSeconds, req.params.id);
 
   // V3'e de yazmayi dene. Bu basarisiz olsa bile (V3 o an erisilemez olsa
   // bile) kendi kaydimiz (SQLite) zaten guvenli sekilde kaydedildi; ajanin
@@ -137,7 +163,6 @@ router.post('/agent/tickets/:id/end', requireAgentToken, async (req, res) => {
       .input('roomCode', sql.NVarChar, ticket.room_code)
       .input('cariKodu', sql.NVarChar, ticket.cari_kodu)
       .input('cariAdi', sql.NVarChar, ticket.cari_adi)
-      .input('category', sql.NVarChar, category)
       .input('status', sql.NVarChar, status)
       .input('note', sql.NVarChar, note || '')
       .input('customerNote', sql.NVarChar, ticket.customer_note)
@@ -145,9 +170,9 @@ router.post('/agent/tickets/:id/end', requireAgentToken, async (req, res) => {
       .input('durationSeconds', sql.Int, durationSeconds)
       .query(`
         INSERT INTO ${v3db.TICKETS_TABLE}
-          (AgentUsername, RoomCode, CariKodu, CariAdi, Category, Status, Note, CustomerNote, StartedAt, EndedAt, DurationSeconds)
+          (AgentUsername, RoomCode, CariKodu, CariAdi, Status, Note, CustomerNote, StartedAt, EndedAt, DurationSeconds)
         VALUES
-          (@agentUsername, @roomCode, @cariKodu, @cariAdi, @category, @status, @note, @customerNote, @startedAt, SYSDATETIME(), @durationSeconds)
+          (@agentUsername, @roomCode, @cariKodu, @cariAdi, @status, @note, @customerNote, @startedAt, SYSDATETIME(), @durationSeconds)
       `);
     await pool.close();
     v3Written = true;
@@ -155,9 +180,49 @@ router.post('/agent/tickets/:id/end', requireAgentToken, async (req, res) => {
     console.error('V3 yazma hatası:', err.message);
   }
 
-  notifyTicketClosed(ticket, { category, note, status, durationSeconds });
+  // Ortak raporlama icin ABSupport'a da yaz (NexusOn_Musteriler ile ayni
+  // veritabani). V3 yazimindan BAGIMSIZ, biri basarisiz olsa digeri yine de
+  // denenir - ikisi de "en iyi caba" (best-effort), asil/canli kayit zaten
+  // SQLite'ta guvende.
+  let absupportWritten = false;
+  try {
+    await absupport.ensureLogsTable();
+    const pool = await absupport.connect();
+    try {
+      await pool
+        .request()
+        .input('cariKodu', ticket.cari_kodu)
+        .input('musteriAdi', ticket.cari_adi)
+        .input('yetkiliAdSoyad', ticket.customer_full_name)
+        .input('telefonNumarasi', ticket.customer_phone)
+        .input('talep', ticket.customer_note)
+        .input('istekSaati', new Date((ticket.requested_at || ticket.started_at) + 'Z'))
+        .input('destekPersoneli', ticket.agent_username)
+        .input('baglantiBaslangicSaati', new Date(ticket.started_at + 'Z'))
+        .input('baglantiBitisSaati', new Date(endedAtIso))
+        .input('sureSaniye', durationSeconds)
+        .input('destekSonucu', STATUS_LABELS[status] || status)
+        .input('personelNotu', note || '')
+        .input('roomCode', ticket.room_code)
+        .query(`
+          INSERT INTO ${absupport.LOGS_TABLE}
+            (CariKodu, MusteriAdi, YetkiliAdSoyad, TelefonNumarasi, Talep, IstekSaati, DestekPersoneli,
+             BaglantiBaslangicSaati, BaglantiBitisSaati, SureSaniye, DestekSonucu, PersonelNotu, RoomCode)
+          VALUES
+            (@cariKodu, @musteriAdi, @yetkiliAdSoyad, @telefonNumarasi, @talep, @istekSaati, @destekPersoneli,
+             @baglantiBaslangicSaati, @baglantiBitisSaati, @sureSaniye, @destekSonucu, @personelNotu, @roomCode)
+        `);
+      absupportWritten = true;
+    } finally {
+      await pool.close();
+    }
+  } catch (err) {
+    console.error('ABSupport log yazma hatası:', err.message);
+  }
 
-  res.json({ ok: true, v3Written });
+  notifyTicketClosed(ticket, { note, status, durationSeconds });
+
+  res.json({ ok: true, v3Written, absupportWritten });
 });
 
 // --------------------------- Admin: gorusme kayitlarini goruntule ---------------------------
@@ -167,7 +232,7 @@ router.get('/admin/tickets', requireAuth, (_req, res) => {
   res.json(tickets);
 });
 
-router.delete('/admin/tickets/:id', requireAuth, (req, res) => {
+router.delete('/admin/tickets/:id', requireAuth, requireFullAdmin, (req, res) => {
   const info = db.prepare('DELETE FROM tickets WHERE id = ?').run(req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: 'Bulunamadı.' });
   res.json({ ok: true });

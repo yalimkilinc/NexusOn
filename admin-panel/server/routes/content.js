@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const db = require('../db');
-const { requireAuth } = require('../middleware');
+const { requireAuth, requireFullAdmin } = require('../middleware');
 
 const router = express.Router();
 
@@ -57,22 +57,30 @@ router.get('/public/content', (req, res) => {
     // henuz version.json yok, sorun degil
   }
 
+  // Personel kurulumu (bkz. app/variant.js, package.json "dist:staff") ayri
+  // bir .exe olarak yayinlanir - musteri kurulumu kendi guncellemesini
+  // isterken yanlislikla personel .exe'sini (ya da tam tersini) indirmesin
+  // diye uygulama ?variant=staff|customer gonderir. Ikisi de AYNI surumde
+  // birlikte derlenip yayinlandigi icin surum bilgisi (version.json) ortak.
+  const variant = req.query.variant === 'staff' ? 'staff' : 'customer';
+  const exeName = variant === 'staff' ? 'NexusOn-Personel-Setup.exe' : 'NexusOn-Setup.exe';
+
   res.json({
     slides: slides.map((s) => toPublicSlide(s, req)),
     news: news.map((n) => n.text),
     latestVersion,
-    downloadUrl: `${req.protocol}://${req.get('host')}/download/NexusOn-Setup.exe`,
+    downloadUrl: `${req.protocol}://${req.get('host')}/download/${exeName}`,
   });
 });
 
 // --------------------------- Admin: slaytlar ---------------------------
 
-router.get('/admin/slides', requireAuth, (req, res) => {
+router.get('/admin/slides', requireAuth, requireFullAdmin, (req, res) => {
   const slides = db.prepare('SELECT * FROM slides ORDER BY sort_order ASC, id ASC').all();
   res.json(slides.map((s) => toPublicSlide(s, req)));
 });
 
-router.post('/admin/slides', requireAuth, upload.single('image'), (req, res) => {
+router.post('/admin/slides', requireAuth, requireFullAdmin, upload.single('image'), (req, res) => {
   const text = (req.body.text || '').trim();
   if (!text) return res.status(400).json({ error: 'Başlık metni gerekli.' });
 
@@ -86,7 +94,7 @@ router.post('/admin/slides', requireAuth, upload.single('image'), (req, res) => 
   res.json(toPublicSlide(row, req));
 });
 
-router.put('/admin/slides/:id', requireAuth, upload.single('image'), (req, res) => {
+router.put('/admin/slides/:id', requireAuth, requireFullAdmin, upload.single('image'), (req, res) => {
   const row = db.prepare('SELECT * FROM slides WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Bulunamadı.' });
 
@@ -110,7 +118,7 @@ router.put('/admin/slides/:id', requireAuth, upload.single('image'), (req, res) 
   res.json(toPublicSlide(updated, req));
 });
 
-router.delete('/admin/slides/:id', requireAuth, (req, res) => {
+router.delete('/admin/slides/:id', requireAuth, requireFullAdmin, (req, res) => {
   const row = db.prepare('SELECT * FROM slides WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Bulunamadı.' });
 
@@ -124,12 +132,12 @@ router.delete('/admin/slides/:id', requireAuth, (req, res) => {
 
 // --------------------------- Admin: duyuru/haber metinleri ---------------------------
 
-router.get('/admin/news', requireAuth, (req, res) => {
+router.get('/admin/news', requireAuth, requireFullAdmin, (req, res) => {
   const news = db.prepare('SELECT * FROM news_items ORDER BY sort_order ASC, id ASC').all();
   res.json(news);
 });
 
-router.post('/admin/news', requireAuth, (req, res) => {
+router.post('/admin/news', requireAuth, requireFullAdmin, (req, res) => {
   const text = (req.body.text || '').trim();
   if (!text) return res.status(400).json({ error: 'Duyuru metni boş olamaz.' });
 
@@ -141,7 +149,7 @@ router.post('/admin/news', requireAuth, (req, res) => {
   res.json(db.prepare('SELECT * FROM news_items WHERE id = ?').get(info.lastInsertRowid));
 });
 
-router.delete('/admin/news/:id', requireAuth, (req, res) => {
+router.delete('/admin/news/:id', requireAuth, requireFullAdmin, (req, res) => {
   const info = db.prepare('DELETE FROM news_items WHERE id = ?').run(req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: 'Bulunamadı.' });
   res.json({ ok: true });
