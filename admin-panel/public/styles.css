@@ -7,8 +7,61 @@
   --text-dim: #93a0c0;
   --accent: #4f7dff;
   --accent-2: #6f97ff;
+  --accent-soft: rgba(79, 125, 255, 0.14);
   --danger: #ef5468;
   --success: #35c98f;
+}
+
+/* ----------------------------------------------- secilebilir temalar ---
+   BrewOn/InsightOn admin panellerindeki 8 temali yapidan tasindi (kullanici
+   istegi) - degisken adlari NexusOn'un kendi adlandirmasina eslendi:
+   surface->panel, surface2->panel-2, muted->text-dim, green->success,
+   red->danger. "night" burada tekrar tanimlanmiyor, zaten yukaridaki
+   :root'un varsayilani. Uygulama html[data-theme] uzerinden (bkz.
+   dashboard.js), secim localStorage'da tutulur. NexusOn Admin markasi
+   (.brand) duz metin oldugu icin - masaustu uygulamadaki logo gorseli gibi -
+   acik temalarda okunabilirlik sorunu yok. */
+html[data-theme="cream"] {
+  --bg: #f6f0e8; --panel: #ffffff; --panel-2: #efe7da; --border: #e2d5c3;
+  --accent: #b5502f; --accent-2: #c97753; --accent-soft: rgba(181, 80, 47, 0.12);
+  --text: #2b2420; --text-dim: #857a6c;
+  --success: #4c8b6b; --danger: #c1443b;
+}
+html[data-theme="teal"] {
+  --bg: #f5f7f6; --panel: #ffffff; --panel-2: #eef2f0; --border: #dde3e0;
+  --accent: #0f766e; --accent-2: #1d9a8f; --accent-soft: rgba(15, 118, 110, 0.12);
+  --text: #1c2624; --text-dim: #5f6e6a;
+  --success: #2e9b5e; --danger: #d64545;
+}
+html[data-theme="orman"] {
+  --bg: #14231e; --panel: #1b2f27; --panel-2: #21382e; --border: #2c4a3d;
+  --accent: #34d399; --accent-2: #5eeab3; --accent-soft: rgba(52, 211, 153, 0.14);
+  --text: #e6f2ec; --text-dim: #8fafa0;
+  --success: #4ade80; --danger: #ef5468;
+}
+html[data-theme="gunbatimi"] {
+  --bg: #fff7ed; --panel: #ffffff; --panel-2: #fceedd; --border: #f3ddbf;
+  --accent: #d97706; --accent-2: #f0973a; --accent-soft: rgba(217, 119, 6, 0.12);
+  --text: #4a2e12; --text-dim: #9a7350;
+  --success: #4c8b6b; --danger: #c1443b;
+}
+html[data-theme="lavanta"] {
+  --bg: #18122b; --panel: #201a37; --panel-2: #282041; --border: #362b54;
+  --accent: #8b5cf6; --accent-2: #a78bfa; --accent-soft: rgba(139, 92, 246, 0.16);
+  --text: #ede9f7; --text-dim: #a79bc4;
+  --success: #34d399; --danger: #f87171;
+}
+html[data-theme="gulkurusu"] {
+  --bg: #fbf7f5; --panel: #ffffff; --panel-2: #f5eae8; --border: #ead9d7;
+  --accent: #b85d64; --accent-2: #d08088; --accent-soft: rgba(184, 93, 100, 0.12);
+  --text: #3d2a2c; --text-dim: #8c7274;
+  --success: #4c8b6b; --danger: #c1443b;
+}
+html[data-theme="kiraz"] {
+  --bg: #1a1618; --panel: #221c1f; --panel-2: #2a2226; --border: #392e32;
+  --accent: #e63946; --accent-2: #f16b76; --accent-soft: rgba(230, 57, 70, 0.16);
+  --text: #f3e9eb; --text-dim: #b49ca1;
+  --success: #34d399; --danger: #ff4d6d;
 }
 
 * { box-sizing: border-box; }
@@ -102,6 +155,35 @@ html, body {
   padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12.5px;
 }
 .logout-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+/* --- Tema secici (BrewOn/InsightOn admin panelleriyle ayni desen) --- */
+.tema-secici { position: relative; }
+.tema-secici-btn {
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: 1px solid var(--border); color: var(--text-dim);
+  padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12.5px;
+  font-family: inherit;
+}
+.tema-secici-btn:hover { border-color: var(--text-dim); color: var(--text); }
+.tema-yuvarlagi {
+  width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+}
+.tema-dropdown {
+  position: fixed; z-index: 300; width: 208px; max-height: 320px; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 12px 32px #00000059; padding: 6px;
+}
+.tema-secenek {
+  display: flex; align-items: center; gap: 9px; width: 100%; margin: 0;
+  padding: 8px 9px; border: none; border-radius: 7px; background: transparent;
+  color: var(--text); font-family: inherit; font-size: 12.5px; font-weight: 600;
+  cursor: pointer; transition: background 0.1s;
+}
+.tema-secenek:hover { background: var(--panel-2); }
+.tema-secenek.secili { background: var(--accent-soft); color: var(--accent); }
+.tema-secenek .etiket { flex: 1; text-align: left; }
+.tema-secenek .onay { font-size: 12px; }
 
 .dashboard-layout {
   display: flex;

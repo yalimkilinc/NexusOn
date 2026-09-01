@@ -3,6 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <title>NexusOn Admin - Giriş</title>
+<script>
+  // Dashboard'da secilen temayi giris ekraninda da uygula (tutarlilik icin) -
+  // stil dosyasindan once calisir, boylece varsayilan temanin kisa bir an
+  // gorunmesi (FOUC) en aza iner.
+  try {
+    var t = localStorage.getItem('nexuson_admin_tema');
+    if (t && t !== 'night') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+</script>
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>

@@ -1,5 +1,102 @@
 // NexusOn Admin Panel - dashboard mantigi. Sade vanilla JS, fetch() ile API'ye baglanir.
 
+// --------------------------- Tema secici ---------------------------
+// BrewOn/InsightOn admin panellerindeki tema listesiyle ayni (kullanici istegi) -
+// renkler orada tanimli, burada sadece kimlik/etiket + secici UI icin yuvarlak
+// onizleme renkleri tutuluyor; gercek renkler styles.css'teki
+// html[data-theme="X"] bloklarindan geliyor.
+const TEMALAR = [
+  { id: 'night', ad: 'Gece Mavisi', zemin: '#0f1420', vurgu: '#4f7dff' },
+  { id: 'cream', ad: 'Studyo Krem', zemin: '#f6f0e8', vurgu: '#b5502f' },
+  { id: 'teal', ad: 'Sade Acik', zemin: '#f5f7f6', vurgu: '#0f766e' },
+  { id: 'orman', ad: 'Orman / Zumrut Yesili', zemin: '#14231e', vurgu: '#34d399' },
+  { id: 'gunbatimi', ad: 'Gun Batimi / Amber', zemin: '#fff7ed', vurgu: '#d97706' },
+  { id: 'lavanta', ad: 'Minimalist Lavanta', zemin: '#18122b', vurgu: '#8b5cf6' },
+  { id: 'gulkurusu', ad: 'Gul Kurusu / Sampanya', zemin: '#fbf7f5', vurgu: '#b85d64' },
+  { id: 'kiraz', ad: 'Kiraz Kirmizisi', zemin: '#1a1618', vurgu: '#e63946' },
+];
+const TEMA_ANAHTARI = 'nexuson_admin_tema';
+const VARSAYILAN_TEMA = 'night';
+
+function temaAl() {
+  let t = null;
+  try { t = localStorage.getItem(TEMA_ANAHTARI); } catch (e) {}
+  return TEMALAR.some((x) => x.id === t) ? t : VARSAYILAN_TEMA;
+}
+
+function temaUygula(id) {
+  if (id === VARSAYILAN_TEMA) {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', id);
+  }
+  try { localStorage.setItem(TEMA_ANAHTARI, id); } catch (e) {}
+}
+
+// Ilk boyamadan once uygula (FOUC'u azaltmak icin dashboard.js'in en basinda,
+// els/init'ten once calisir).
+temaUygula(temaAl());
+
+function yuvarlakStil(t) {
+  return `background:linear-gradient(135deg, ${t.zemin} 50%, ${t.vurgu} 50%);`;
+}
+
+function temaSeciciKur() {
+  const btn = document.getElementById('temaBtn');
+  const yuvarlak = document.getElementById('temaYuvarlagi');
+  if (!btn || !yuvarlak) return;
+  let dropdown = null;
+
+  function yuvarlagiGuncelle() {
+    const guncelId = temaAl();
+    const t = TEMALAR.find((x) => x.id === guncelId) || TEMALAR[0];
+    yuvarlak.style.cssText = yuvarlakStil(t);
+  }
+  yuvarlagiGuncelle();
+
+  function kapat() {
+    if (dropdown) { dropdown.remove(); dropdown = null; }
+    document.removeEventListener('mousedown', disaridaTikla);
+  }
+  function disaridaTikla(e) {
+    if (dropdown && !dropdown.contains(e.target) && e.target !== btn && !btn.contains(e.target)) kapat();
+  }
+  function ac() {
+    if (dropdown) { kapat(); return; }
+    const guncelId = temaAl();
+    dropdown = document.createElement('div');
+    dropdown.className = 'tema-dropdown';
+    dropdown.innerHTML = TEMALAR.map((t) => {
+      const secili = t.id === guncelId;
+      return `<button type="button" class="tema-secenek${secili ? ' secili' : ''}" data-tema-id="${t.id}">
+        <span class="tema-yuvarlagi" style="${yuvarlakStil(t)}"></span>
+        <span class="etiket">${t.ad}</span>
+        ${secili ? '<span class="onay">✓</span>' : ''}
+      </button>`;
+    }).join('');
+    document.body.appendChild(dropdown);
+
+    const r = btn.getBoundingClientRect();
+    const dRect = dropdown.getBoundingClientRect();
+    let sol = r.right - dRect.width;
+    if (sol < 8) sol = r.left;
+    let ust = r.bottom + 6;
+    if (ust + dRect.height > window.innerHeight - 8) ust = r.top - dRect.height - 6;
+    dropdown.style.left = Math.max(8, sol) + 'px';
+    dropdown.style.top = Math.max(8, ust) + 'px';
+
+    dropdown.querySelectorAll('.tema-secenek').forEach((optBtn) => {
+      optBtn.addEventListener('click', () => {
+        temaUygula(optBtn.getAttribute('data-tema-id'));
+        yuvarlagiGuncelle();
+        kapat();
+      });
+    });
+    setTimeout(() => document.addEventListener('mousedown', disaridaTikla), 0);
+  }
+  btn.addEventListener('click', ac);
+}
+
 const els = {
   whoami: document.getElementById('whoami'),
   logoutBtn: document.getElementById('logoutBtn'),
@@ -102,6 +199,7 @@ async function init() {
   }
   currentRole = session.role;
   els.whoami.textContent = session.username;
+  temaSeciciKur();
 
   els.customerStableLink.textContent = `${location.origin}/download/NexusOn-Setup.exe`;
   els.staffStableLink.textContent = `${location.origin}/download/NexusOn-Personel-Setup.exe`;
