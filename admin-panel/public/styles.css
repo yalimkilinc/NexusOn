@@ -331,7 +331,7 @@ html, body {
 
 .agent-row {
   display: grid;
-  grid-template-columns: 90px 1fr 130px 1fr 60px 26px;
+  grid-template-columns: 1.3fr 0.9fr 110px 1.3fr 60px 26px;
   align-items: center;
   gap: 12px;
 }
