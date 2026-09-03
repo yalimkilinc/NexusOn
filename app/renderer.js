@@ -56,8 +56,8 @@ const HEADER_LEN = 8; // her binary dosya parcasinin basindaki transferId etiket
 // NOT: "localhost" yalnizca sunucularla AYNI bilgisayarda calisir. Baska bir
 // bilgisayardan baglanabilmesi icin bu sunucularin calistigi bilgisayarin
 // gercek ag adresi (LAN IP ya da gercek bir sunucu adresi) kullanilmali.
-const DEFAULT_SERVER_URL = 'wss://nexuson.abyazilim.com.tr:11085'; // musteri (host) ekraninda gizli, sabit deger
-const API_BASE_URL = 'https://nexuson.abyazilim.com.tr:11086'; // admin panel: icerik, ajan girisi, destek kayitlari
+const DEFAULT_SERVER_URL = 'wss://nexuson-sinyal.novrixon.com.tr'; // musteri (host) ekraninda gizli, sabit deger
+const API_BASE_URL = 'https://nexuson.novrixon.com.tr'; // admin panel: icerik, ajan girisi, destek kayitlari
 const CONTENT_API_URL = `${API_BASE_URL}/api/public/content?variant=${IS_STAFF_BUILD ? 'staff' : 'customer'}`;
 
 const CONTACT = {

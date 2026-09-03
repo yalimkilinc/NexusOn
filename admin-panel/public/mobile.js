@@ -3,7 +3,7 @@
 // masaustu uygulamasindaki ayni WebRTC/sinyal protokolunu kullanir.
 
 const API_BASE_URL = window.location.origin;
-const SIGNAL_URL = `wss://${window.location.hostname}:11085`;
+const SIGNAL_URL = 'wss://nexuson-sinyal.novrixon.com.tr';
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 const CHUNK_SIZE = 16 * 1024;
 const HEADER_LEN = 8;

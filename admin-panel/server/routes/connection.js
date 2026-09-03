@@ -41,7 +41,7 @@ function buildDeepLinkKeyboard(roomCode, cariKodu, cariAdi) {
   if (cariKodu) params.set('cariKodu', cariKodu);
   if (cariAdi) params.set('cariAdi', cariAdi);
   return {
-    inline_keyboard: [[{ text: 'NexusOn\'da Aç', url: `https://nexuson.abyazilim.com.tr:11086/api/public/open?${params.toString()}` }]],
+    inline_keyboard: [[{ text: 'NexusOn\'da Aç', url: `https://nexuson.novrixon.com.tr/api/public/open?${params.toString()}` }]],
   };
 }
 

@@ -31,6 +31,13 @@ const { runWeeklyCustomerSummary } = require('./weeklySummary');
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 
 const app = express();
+// Caddy/başka bir reverse proxy arkasında çalışırken req.protocol'ün
+// X-Forwarded-Proto'ya göre dogru (https) donmesi icin gerekli - yoksa
+// indirme linki gibi req.protocol kullanan yerler yanlislikla http:// uretir.
+// SADECE loopback'ten (127.0.0.1) gelen baglantilarda bu basliklara guvenir -
+// disaridan dogrudan baglanan biri (proxy yokken, ör. eski VPS) sahte
+// X-Forwarded-For ile rate-limit atlatamaz.
+app.set('trust proxy', 'loopback');
 
 // NexusOn masaustu uygulamasi file:// kaynagindan istek atar (Origin: null
 // olarak gelir), bu yuzden CORS'u herkese aciyoruz. ONEMLI (guvenlik
