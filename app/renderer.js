@@ -117,6 +117,7 @@ const els = {
   customerSearchResults: document.getElementById('customerSearchResults'),
   selectedCustomerLabel: document.getElementById('selectedCustomerLabel'),
   changeCustomerBtn: document.getElementById('changeCustomerBtn'),
+  manualCustomerBtn: document.getElementById('manualCustomerBtn'),
   viewerSetup: document.getElementById('viewerSetup'),
   hostRequestCategory: document.getElementById('hostRequestCategory'),
   hostRequestNote: document.getElementById('hostRequestNote'),
@@ -568,6 +569,18 @@ async function selectCustomer(customer) {
   setRole('viewer');
   await fillPendingConnectionRequestCode(customer.cariKodu);
 }
+
+// V3'te bulunamayan/kayitli olmayan bir musteriye baglanmak icin: cari_kodu
+// olmadan da bilet acilabiliyor (bkz. admin-panel/server/routes/tickets.js),
+// ama bu yol RAPORLANABILIR olsun diye isManual isaretleniyor - "Destek
+// Kayitlari" listesinde ayrica gosterilir, personel bazinda da sayilir
+// (yoneticinin bu yolun kotuye kullanilip kullanilmadigini gorebilmesi icin).
+function selectManualCustomer() {
+  state.customer = { cariKodu: null, cariAdi: 'Kayıt Dışı Müşteri', isManual: true };
+  els.selectedCustomerLabel.textContent = 'Kayıt Dışı Müşteri (manuel)';
+  setRole('viewer');
+}
+els.manualCustomerBtn.addEventListener('click', selectManualCustomer);
 
 // Musteri "Bağlantı Talebi İlet" ile daha once bir talep birakmissa (Telegram
 // bildirimindeki kod), destek personeli bu musteriyi secince kod alanina
@@ -2285,6 +2298,7 @@ async function startTicket(ctx) {
         roomCode: ctx.roomCode,
         cariKodu: ctx.customer?.cariKodu,
         cariAdi: ctx.customer?.cariAdi,
+        isManualCustomer: !!ctx.customer?.isManual,
       }),
     });
     const data = await res.json();

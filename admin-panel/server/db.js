@@ -146,6 +146,18 @@ for (const col of ['cari_kodu', 'cari_adi', 'customer_phone', 'customer_full_nam
   if (!cols.includes(col)) db.exec(`ALTER TABLE tickets ADD COLUMN ${col} TEXT`);
 }
 
+// Personel, musteriyi V3'te bulamadiginda "Manuel Baglan" ile cari_kodu
+// olmadan da baglanabilir (bkz. app/renderer.js selectManualCustomer).
+// Bu sutun, raporlarda bu yolun ne siklikta kullanildigini gorebilmek icin -
+// sadece cari_kodu'nun bos olmasina bakmak yetmez, cunku V3 disi baglanti
+// disinda da (cok eski kayitlar, farkli bir hata) bos kalabilir.
+{
+  const cols = db.prepare('PRAGMA table_info(tickets)').all().map((c) => c.name);
+  if (!cols.includes('is_manual_customer')) {
+    db.exec('ALTER TABLE tickets ADD COLUMN is_manual_customer INTEGER NOT NULL DEFAULT 0');
+  }
+}
+
 // Var olan (eski) admins tablosunda role sutunu olmayabilir; sonradan ekle.
 // 'admin' = her seye erisebilir, 'destek' = sadece Destek Kayitlari ve
 // Kurulum Dosyasi (indirme linkleri) sayfalarini gorebilir.

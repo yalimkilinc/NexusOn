@@ -413,3 +413,11 @@ html, body {
 .status-pill.cozuldu { background: #123d2c; color: var(--success); }
 .status-pill.devam_ediyor { background: #3a2f0f; color: #e8b93b; }
 .status-pill.yonlendirildi { background: #1d2c55; color: var(--accent-2); }
+
+/* Musteri V3'te secilmeden (manuel) baglanilan gorusmeleri gorunur kil -
+   yoneticinin bu yolun ne kadar kullanildigini fark edebilmesi icin. */
+.manual-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  background: #3a2410; color: #e8973b; margin-right: 6px; white-space: nowrap;
+}
+.ticket-stat-chip .manual-count { color: #e8973b; font-weight: 600; }

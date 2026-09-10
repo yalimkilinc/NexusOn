@@ -25,6 +25,7 @@ const els = {
   logoutBtn2: document.getElementById('logoutBtn2'),
   selectedCustomerText: document.getElementById('selectedCustomerText'),
   changeCustomerBtn: document.getElementById('changeCustomerBtn'),
+  manualCustomerBtn: document.getElementById('manualCustomerBtn'),
   roomCodeInput: document.getElementById('roomCodeInput'),
   connectBtn: document.getElementById('connectBtn'),
   connectError: document.getElementById('connectError'),
@@ -206,6 +207,16 @@ els.changeCustomerBtn.addEventListener('click', () => {
   showScreen('customer');
 });
 
+// V3'te bulunamayan musteriye de baglanabilmek icin (bkz. app/renderer.js
+// selectManualCustomer ile ayni desen) - isManual isaretlenir, raporlarda
+// ayirt edilebilsin diye.
+els.manualCustomerBtn.addEventListener('click', () => {
+  state.customer = { cariKodu: null, cariAdi: 'Kayıt Dışı Müşteri', isManual: true };
+  els.selectedCustomerText.textContent = 'Kayıt Dışı Müşteri (manuel)';
+  els.roomCodeInput.value = '';
+  showScreen('connect');
+});
+
 // --------------------------- Baglanti kurma ---------------------------
 
 els.connectBtn.addEventListener('click', () => {
@@ -385,6 +396,7 @@ async function startTicket() {
         roomCode: state.roomCode,
         cariKodu: state.customer?.cariKodu,
         cariAdi: state.customer?.cariAdi,
+        isManualCustomer: !!state.customer?.isManual,
       }),
     });
     const data = await res.json();

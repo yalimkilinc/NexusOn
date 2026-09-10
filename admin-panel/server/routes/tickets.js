@@ -70,6 +70,7 @@ router.post('/agent/tickets/start', requireAgentToken, (req, res) => {
   const roomCode = String((req.body && req.body.roomCode) || '').trim();
   const cariKodu = req.body && req.body.cariKodu ? String(req.body.cariKodu) : null;
   const cariAdi = req.body && req.body.cariAdi ? String(req.body.cariAdi) : null;
+  const isManualCustomer = req.body && req.body.isManualCustomer ? 1 : 0;
   if (!roomCode) return res.status(400).json({ error: 'Oda kodu gerekli.' });
 
   const roomNote = db.prepare('SELECT note FROM room_notes WHERE room_code = ?').get(roomCode);
@@ -92,8 +93,8 @@ router.post('/agent/tickets/start', requireAgentToken, (req, res) => {
   const info = db
     .prepare(
       `INSERT INTO tickets
-        (agent_id, agent_username, room_code, cari_kodu, cari_adi, customer_note, customer_phone, customer_full_name, requested_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`
+        (agent_id, agent_username, room_code, cari_kodu, cari_adi, customer_note, customer_phone, customer_full_name, requested_at, is_manual_customer)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?)`
     )
     .run(
       req.agent.agentId,
@@ -104,7 +105,8 @@ router.post('/agent/tickets/start', requireAgentToken, (req, res) => {
       customerNote,
       customerPhone,
       customerFullName,
-      requestedAt
+      requestedAt,
+      isManualCustomer
     );
 
   if (roomNote) db.prepare('DELETE FROM room_notes WHERE room_code = ?').run(roomCode);

@@ -476,9 +476,10 @@ function renderTicketStats(tickets) {
   const finished = tickets.filter((t) => t.ended_at);
   const perAgent = {};
   for (const t of finished) {
-    perAgent[t.agent_username] = perAgent[t.agent_username] || { count: 0, totalDuration: 0 };
+    perAgent[t.agent_username] = perAgent[t.agent_username] || { count: 0, totalDuration: 0, manualCount: 0 };
     perAgent[t.agent_username].count += 1;
     perAgent[t.agent_username].totalDuration += t.duration_seconds || 0;
+    if (t.is_manual_customer) perAgent[t.agent_username].manualCount += 1;
   }
 
   els.ticketStats.innerHTML = '';
@@ -489,12 +490,17 @@ function renderTicketStats(tickets) {
   }
 
   for (const name of agentNames) {
-    const { count, totalDuration } = perAgent[name];
+    const { count, totalDuration, manualCount } = perAgent[name];
     const avg = Math.round(totalDuration / count);
     const chip = document.createElement('div');
     chip.className = 'ticket-stat-chip';
-    chip.innerHTML = `<b></b> — <span></span> görüşme, ort. <span></span>`;
-    const spans = chip.querySelectorAll('span');
+    // Manuel baglanti oranini gorunur kilmak icin - "yonetici bu yolu kotuye
+    // kullanan var mi gorebilmeli" istegi (kullanici geri bildirimi).
+    const manualPart = manualCount > 0
+      ? ` · <span class="manual-count" title="Müşteri seçmeden (V3'te bulunamadı) bağlanılan görüşme sayısı">${manualCount} manuel</span>`
+      : '';
+    chip.innerHTML = `<b></b> — <span></span> görüşme, ort. <span></span>${manualPart}`;
+    const spans = chip.querySelectorAll('span:not(.manual-count)');
     chip.querySelector('b').textContent = name;
     spans[0].textContent = count;
     spans[1].textContent = formatDuration(avg);
@@ -530,7 +536,11 @@ function renderTicketTable(tickets) {
     cells[0].textContent = t.started_at;
     cells[1].textContent = t.agent_username;
     cells[2].textContent = t.room_code;
-    cells[3].textContent = customerLabel || '—';
+    if (t.is_manual_customer) {
+      cells[3].innerHTML = `<span class="manual-badge" title="Personel müşteriyi V3'te bulamadı, manuel bağlandı">Manuel</span> ${customerLabel || ''}`;
+    } else {
+      cells[3].textContent = customerLabel || '—';
+    }
     cells[4].textContent = t.customer_note || '—';
     cells[6].textContent = formatDuration(t.duration_seconds);
     cells[7].textContent = t.note || '—';
