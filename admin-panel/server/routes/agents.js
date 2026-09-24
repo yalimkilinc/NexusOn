@@ -37,19 +37,6 @@ router.post('/agent-logout', requireAgentToken, (req, res) => {
   res.json({ ok: true });
 });
 
-// DEPRECATED (denetim E-2): NexusOn 1.1.2 ve sonrasi bu ucu KULLANMIYOR
-// (personel kullanici adini elle yazar). Giris yapmamis herkese personel
-// adlarini actigi icin, personelin hepsi 1.1.2+ surume gectikten sonra bu
-// route KALDIRILMALI. Eski surumler giris listesini buradan dolduruyordu, bu
-// yuzden erken silinirse guncellememis personel giris yapamaz.
-// Sadece kimlik bilgisi (kullanici kodu + ad) doner - sifre/telefon/e-posta ASLA donmez.
-router.get('/public/agents', (_req, res) => {
-  const agents = db
-    .prepare('SELECT username, full_name FROM agents ORDER BY COALESCE(full_name, username) ASC')
-    .all();
-  res.json(agents.map((a) => ({ username: a.username, fullName: a.full_name || a.username })));
-});
-
 // Destek personeli kendi sifresini kendisi degistirir (admin panele
 // gitmesine gerek kalmadan) - mevcut sifre dogrulanarak.
 router.post('/agent/change-password', requireAgentToken, (req, res) => {

@@ -18,7 +18,7 @@ Her madde bağımsızdır, sırayla yapılması zorunlu değildir.
 | C-1/2/3 | Kodda yapıldı ve 1.2.0 ile yayında. **Gerçek müşteri logu bekleniyor** (müşteri güncelleyip bir oturum açınca). |
 | D | Yapıldı (1.2.0), Electron'da uçtan uca test edildi. Onay metni taslaktır, hukuk onayı gerekir. |
 | E-1 | Yapıldı (+ aynı dosyadaki iki `innerHTML` daha). |
-| E-2 | İstemci kısmı yapıldı. **Sunucu ucu (`/api/public/agents`) bilerek duruyor**; tüm personel 1.2.0'a geçince silinmeli. |
+| E-2 | Yapıldı. İstemci artık listeyi çağırmıyor, sunucudaki `/api/public/agents` ucu kaldırıldı (canlıda 404). |
 | E-3 | Yapıldı. 24 Eylül 2026 itibarıyla `version.json` 1.2.0, iki kurulum dosyası yayında. |
 | E-4 | Yapıldı. Asıl sorun `&` yüzünden derleme hatasının başarılı görünmesiydi, `scripts/dist-staff.js` çıkış kodunu koruyor. |
 | E-5, E-9, E-10 | Yapıldı. |
@@ -303,7 +303,7 @@ Bu aynı zamanda KVKK bulgusu #1 ve #2'yi de kapatıyor.
 | # | İş | Dosya |
 |---|---|---|
 | E-1 | `innerHTML` → `textContent` (depolanmış XSS) | `admin-panel\public\mobile.js:594-601` |
-| E-2 | `/api/public/agents` kaldır veya kimlik doğrulaması arkasına al | `admin-panel\server\routes\agents.js:43` |
+| E-2 | Yapıldı. İstemci artık listeyi çağırmıyor, sunucudaki `/api/public/agents` ucu kaldırıldı (canlıda 404). |
 | E-3 | Yapıldı. 24 Eylül 2026 itibarıyla `version.json` 1.2.0, iki kurulum dosyası yayında. |
 | E-4 | `dist:staff` script'inde `&` → `&&` | `app\package.json:10` |
 | E-5 | `NEXUSGO_AUTOSCRIPT` kancasını `if (!app.isPackaged)` içine al | `app\main.js:149-157` |
