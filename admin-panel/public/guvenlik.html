@@ -361,8 +361,11 @@
     <p>
       Uygulama, sektörde uzaktan destek çözümlerinde yaygın kabul gören <strong>WebRTC</strong>
       teknolojisini kullanır. Sunucularımız yalnızca iki tarafın birbirini bulmasına aracılık eder
-      (sinyalleşme); ekran görüntüsü, fare/klavye komutları ve dosya içeriği bu aracı sunuculardan
-      <strong>geçmez</strong>, iki bilgisayar arasında doğrudan ve uçtan uca şifreli olarak taşınır.
+      (sinyalleşme). Ekran görüntüsü, fare/klavye komutları ve dosya içeriği, çoğu bağlantıda iki
+      bilgisayar arasında doğrudan ve uçtan uca şifreli olarak taşınır. Doğrudan bağlantının
+      kurulamadığı durumlarda (örneğin kurumsal güvenlik duvarı arkasında) şifreli paketler bir
+      aktarma (TURN) sunucusu üzerinden iletilir; bu sunucu paketleri yalnızca aktarır, şifreli
+      içeriği çözemez.
     </p>
     <p>
       Yönetim paneli ve destek personeli girişleri ayrı, kimlik doğrulamalı bir sunucu üzerinden
@@ -380,7 +383,7 @@
     <div class="measures-grid">
       <div class="measure-item">
         <span class="measure-check">✓</span>
-        <span class="measure-text"><b>Uçtan uca şifreleme</b> — ekran görüntüsü ve kontrol verisi DTLS/SRTP ile şifrelenir, aracı sunuculardan geçmez.</span>
+        <span class="measure-text"><b>Uçtan uca şifreleme</b> — ekran görüntüsü ve kontrol verisi DTLS/SRTP ile şifrelenir; aktarma sunucusu devreye girdiğinde bile içerik çözülemez.</span>
       </div>
       <div class="measure-item">
         <span class="measure-check">✓</span>
@@ -404,7 +407,7 @@
       </div>
       <div class="measure-item">
         <span class="measure-check">✓</span>
-        <span class="measure-text"><b>Gizli anahtarların istemciye gömülmemesi</b> — üçüncü taraf entegrasyon anahtarları yalnızca sunucuda tutulur, uygulama koduna hiç eklenmez.</span>
+        <span class="measure-text"><b>Kritik anahtarların sunucuda tutulması</b> — veritabanı, e-posta ve bildirim entegrasyonlarının kimlik bilgileri yalnızca sunucuda tutulur, uygulama koduna eklenmez. Uygulamada yalnızca bağlantı aktarma (TURN) hizmetinin kullanıma özel erişim bilgisi bulunur.</span>
       </div>
       <div class="measure-item">
         <span class="measure-check">✓</span>

@@ -598,14 +598,19 @@ function addTransferRow(transferId, name, size, direction) {
   const row = document.createElement('div');
   row.className = 'transfer-row';
   row.id = `transfer-${transferId}`;
+  // GUVENLIK: dosya adi karsi taraftan geliyor - innerHTML'e gomulurse
+  // depolanmis XSS olur. Degisken kisimlar textContent ile yazilir.
   row.innerHTML = `
     <div class="name-row">
-      <span><span class="direction">${direction === 'out' ? 'Gönderiliyor →' : '← Alınıyor'}</span>${name}</span>
-      <span class="size">${formatSize(size)}</span>
+      <span><span class="direction"></span><span class="file-name"></span></span>
+      <span class="size"></span>
     </div>
     <div class="progress-track"><div class="progress-fill" style="width:0%"></div></div>
     <div class="status-text"></div>
   `;
+  row.querySelector('.direction').textContent = direction === 'out' ? 'Gönderiliyor →' : '← Alınıyor';
+  row.querySelector('.file-name').textContent = name;
+  row.querySelector('.size').textContent = formatSize(size);
   els.transferList.appendChild(row);
 }
 

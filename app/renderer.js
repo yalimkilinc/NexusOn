@@ -1302,7 +1302,8 @@ async function setupPeerConnection(ctx, sessionId) {
         if (report.type === 'outbound-rtp' && report.kind === 'video') {
           window.nexuson.debugLog(
             `[stats] GONDERILEN video: ${report.frameWidth}x${report.frameHeight} ` +
-              `${report.framesPerSecond}fps bytesSent=${report.bytesSent} qualityLimitationReason=${report.qualityLimitationReason}`
+              `${report.framesPerSecond}fps bytesSent=${report.bytesSent} qualityLimitationReason=${report.qualityLimitationReason} ` +
+              `encoderImplementation=${report.encoderImplementation}`
           );
           selfSummary = {
             role: state.role,
@@ -1332,8 +1333,15 @@ async function setupPeerConnection(ctx, sessionId) {
           );
         }
         if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.nominated) {
+          // Baglantinin TURN relay uzerinden mi yoksa dogrudan (P2P) mi gittigini
+          // olcmek icin yerel/uzak aday tiplerini okuyoruz.
+          const local = stats.get(report.localCandidateId);
+          const remote = stats.get(report.remoteCandidateId);
+          const relay = local?.candidateType === 'relay' || remote?.candidateType === 'relay';
           window.nexuson.debugLog(
-            `[stats] aktif aday çifti: currentRoundTripTime=${report.currentRoundTripTime} ` +
+            `[stats] YOL=${relay ? 'TURN RELAY' : 'P2P'} ` +
+              `local=${local?.candidateType}/${local?.protocol} remote=${remote?.candidateType} ` +
+              `currentRoundTripTime=${report.currentRoundTripTime} ` +
               `availableOutgoingBitrate=${report.availableOutgoingBitrate}`
           );
         }
@@ -1463,12 +1471,18 @@ function applyDxgiEncoderParams(ctx, sender) {
   if (ctx.dxgiNativeWidth && ctx.dxgiNativeHeight) {
     scaleResolutionDownBy = Math.max(1, ctx.dxgiNativeWidth / MAX_W, ctx.dxgiNativeHeight / MAX_H);
   }
+  // 'maintain-resolution' + 2,5 Mbps tavan, hareketli sahnede (pencere
+  // surukleme) kare hizini tek haneye dusuruyordu. 'balanced' cozunurluk ve
+  // kare hizini birlikte dengeler, tavan 8 Mbps'e cikarildi. getParameters()'tan
+  // gelen mevcut alanlar (active vb.) korunur.
+  const params = sender.getParameters();
+  params.degradationPreference = 'balanced';
+  if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+  params.encodings[0].maxBitrate = 8_000_000;
+  params.encodings[0].maxFramerate = 30;
+  params.encodings[0].scaleResolutionDownBy = scaleResolutionDownBy;
   sender
-    .setParameters({
-      ...sender.getParameters(),
-      degradationPreference: 'maintain-resolution',
-      encodings: [{ maxBitrate: 2_500_000, scaleResolutionDownBy }],
-    })
+    .setParameters(params)
     .then(() => window.nexuson.debugLog('[capture] sender.setParameters başarılı'))
     .catch((err) => window.nexuson.debugLog(`[capture] sender.setParameters HATASI: ${err.message}`));
 }
@@ -1593,6 +1607,7 @@ async function recoverStalledDisplayMediaCapture(ctx) {
   try {
     const freshStream = await navigator.mediaDevices.getDisplayMedia(fallbackDisplayMediaConstraints());
     const freshTrack = freshStream.getVideoTracks()[0];
+    freshTrack.contentHint = 'detail';
     if (ctx.dxgiSender) {
       await ctx.dxgiSender.replaceTrack(freshTrack);
       window.nexuson.debugLog('[capture] izci kurtarmasi basarili (replaceTrack)');
@@ -1630,6 +1645,8 @@ async function startDxgiCapture(ctx, targetFps) {
   const STALL_SKIP_THRESHOLD = Math.round(targetFps * 3); // ~3 saniyelik ardisik atlama
 
   let generator = new MediaStreamTrackGenerator({ kind: 'video' });
+  // Bos birakilirsa WebRTC icerigi kamera sanip ekran optimizasyonlarini kapatir.
+  generator.contentHint = 'detail';
   let writer = generator.writable.getWriter();
   const outStream = new MediaStream([generator]);
 
@@ -1644,6 +1661,7 @@ async function startDxgiCapture(ctx, targetFps) {
       // eski yazici zaten bozulmus olabilir, onemli degil
     }
     generator = new MediaStreamTrackGenerator({ kind: 'video' });
+    generator.contentHint = 'detail';
     writer = generator.writable.getWriter();
     if (ctx.dxgiSender) {
       try {
@@ -1778,6 +1796,7 @@ async function startDxgiCapture(ctx, targetFps) {
     try {
       const fallbackStream = await navigator.mediaDevices.getDisplayMedia(fallbackDisplayMediaConstraints());
       const fallbackTrack = fallbackStream.getVideoTracks()[0];
+      fallbackTrack.contentHint = 'detail';
       if (ctx.dxgiSender) {
         await ctx.dxgiSender.replaceTrack(fallbackTrack);
         window.nexuson.debugLog('[dxgi] getDisplayMedia yedegine gecis basarili (replaceTrack)');
@@ -2015,6 +2034,9 @@ async function startHostOffer(ctx, sessionId) {
       sendCaptureStatus(ctx, 'fallback', `DXGI başlatılamadı: ${err.message}`);
     }
     ctx.localStream = stream;
+    stream.getVideoTracks().forEach((track) => {
+      track.contentHint = 'detail';
+    });
     stream.getTracks().forEach((track) => {
       window.nexuson.debugLog(`[capture] track.getSettings(): ${JSON.stringify(track.getSettings())}`);
       const sender = pc.addTrack(track, stream);
