@@ -199,10 +199,21 @@ wss.on('connection', (ws, req) => {
 
       ws.roomCode = roomCode;
       ws.role = role;
+      // Musteriye "kim baglaniyor" gosterebilmek icin personelin gorunen adi
+      // karsi tarafa iletilir. Sadece bilgilendirme amaclidir (dogrulanmis
+      // kimlik degil); kontrol karakterleri temizlenir, uzunluk sinirlanir.
+      ws.displayName = String(msg.name || '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 60);
       room.add(ws);
 
-      broadcastToRoom(ws, { type: 'peer-joined', role });
-      send(ws, { type: 'joined', roomCode, role, peers: room.size - 1 });
+      broadcastToRoom(ws, { type: 'peer-joined', role, name: ws.displayName });
+      const otherPeer = [...room].find((p) => p !== ws);
+      send(ws, {
+        type: 'joined',
+        roomCode,
+        role,
+        peers: room.size - 1,
+        peerName: otherPeer ? otherPeer.displayName || '' : '',
+      });
       return;
     }
 

@@ -121,7 +121,7 @@ els.loginBtn.addEventListener('click', async () => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Giriş başarısız.');
 
-    state.agent = { username: data.username, token: data.token };
+    state.agent = { username: data.username, fullName: data.fullName || data.username, token: data.token };
     saveAgentSession();
     els.usernameLabel.textContent = data.username;
     els.usernameLabel2.textContent = data.username;
@@ -176,7 +176,11 @@ async function searchCustomers(term) {
     if (!res.ok) throw new Error(data.error || 'Arama başarısız.');
     renderCustomerResults(data);
   } catch (err) {
-    els.customerResults.innerHTML = `<p class="empty-hint">${err.message}</p>`;
+    const hint = document.createElement('p');
+    hint.className = 'empty-hint';
+    hint.textContent = err.message;
+    els.customerResults.innerHTML = '';
+    els.customerResults.appendChild(hint);
   }
 }
 
@@ -190,8 +194,12 @@ function renderCustomerResults(customers) {
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'result-row';
-    row.innerHTML = `${c.cariAdi}<span class="cari-kodu"></span>`;
-    row.querySelector('.cari-kodu').textContent = c.cariKodu;
+    // cariAdi V3 veritabanindan geliyor - innerHTML'e gomulmez (XSS).
+    row.textContent = c.cariAdi;
+    const kod = document.createElement('span');
+    kod.className = 'cari-kodu';
+    kod.textContent = c.cariKodu;
+    row.appendChild(kod);
     row.addEventListener('click', () => {
       state.customer = c;
       els.selectedCustomerText.textContent = c.cariAdi;
@@ -240,7 +248,7 @@ function connect(roomCode) {
   state.ws = ws;
 
   ws.onopen = () => {
-    ws.send(JSON.stringify({ type: 'join', roomCode, role: 'viewer' }));
+    ws.send(JSON.stringify({ type: 'join', roomCode, role: 'viewer', name: (state.agent && (state.agent.fullName || state.agent.username)) || '' }));
   };
 
   ws.onclose = () => { if (state.ws === ws) disconnect('Sinyal sunucusu bağlantısı kapandı.'); };

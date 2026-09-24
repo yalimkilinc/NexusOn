@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('nexuson', {
   showFileInFolder: (filePath) => ipcRenderer.invoke('show-file-in-folder', filePath),
 
   sendRemoteInput: (evt) => ipcRenderer.invoke('remote-input', evt),
+  // Musterinin uzaktan kontrol onayini ana surece bildirir (ana surec
+  // 'remote-input' kapisini buna gore acar/kapatir; varsayilan KAPALI).
+  setControlConsent: (allowed) => ipcRenderer.invoke('consent-set-control', allowed === true),
   onRemoteInputError: (cb) => ipcRenderer.on('remote-input-error', (_e, message) => cb(message)),
 
   openExternal: (url) => ipcRenderer.invoke('open-external', url),

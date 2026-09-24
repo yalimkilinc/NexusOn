@@ -141,6 +141,15 @@ const els = {
   remoteVideo: document.getElementById('remoteVideo'),
   hostPlaceholder: document.getElementById('hostPlaceholder'),
   allowControlCheckbox: document.getElementById('allowControlCheckbox'),
+  consentOverlay: document.getElementById('consentOverlay'),
+  consentAgentName: document.getElementById('consentAgentName'),
+  consentViewCheckbox: document.getElementById('consentViewCheckbox'),
+  consentControlCheckbox: document.getElementById('consentControlCheckbox'),
+  consentAcceptBtn: document.getElementById('consentAcceptBtn'),
+  consentDenyBtn: document.getElementById('consentDenyBtn'),
+  hostAccessBadge: document.getElementById('hostAccessBadge'),
+  hostAccessText: document.getElementById('hostAccessText'),
+  revokeControlBtn: document.getElementById('revokeControlBtn'),
   controlHint: document.getElementById('controlHint'),
   remoteCursorDot: document.getElementById('remoteCursorDot'),
   disconnectBtn: document.getElementById('disconnectBtn'),
@@ -327,26 +336,18 @@ function setRole(role) {
 
 // --------------------------- Destek personeli girisi ---------------------------
 
-// Personel giris ekranindaki secim listesini admin panelde kayitli
-// personelle doldurur - kullanici kendi adini/kodunu yazmak yerine listeden
-// secer, sadece sifresini yazar. Panel calismiyorsa ya da ag erisimi yoksa
-// sessizce bos birakilir (uygulama cokmez).
-async function loadAgentList() {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/public/agents`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const agents = await res.json();
-    for (const a of agents) {
-      const opt = document.createElement('option');
-      opt.value = a.username;
-      opt.textContent = a.fullName;
-      els.agentUsernameInput.appendChild(opt);
-    }
-  } catch (err) {
-    log('Personel listesi alınamadı. Sunucuya bağlanılamadığından giriş de yapılamayacaktır.');
-  }
+// Personel giris ekrani: kullanici adi elle yazilir. Eskiden kayitli tum
+// personelin listesi herkese acik bir uctan (/api/public/agents) cekilip bir
+// secim kutusuna doldurulurdu - bu, giris yapmamis herkese personel adlarini
+// aciyordu (kaba kuvvet icin kesif). Son giris yapilan kullanici adi bu
+// makinede hatirlanir, boylece her seferinde yeniden yazmak gerekmez.
+const LAST_AGENT_USERNAME_KEY = 'nexuson_last_agent_username';
+try {
+  const lastUsername = localStorage.getItem(LAST_AGENT_USERNAME_KEY);
+  if (lastUsername) els.agentUsernameInput.value = lastUsername;
+} catch {
+  // localStorage erisilemezse bos birak
 }
-loadAgentList();
 
 els.agentLoginBtn.addEventListener('click', async () => {
   const username = els.agentUsernameInput.value.trim();
@@ -372,9 +373,14 @@ els.agentLoginBtn.addEventListener('click', async () => {
     // Cerez yerine token: NexusOn (file://) ile sunucu (http://) farkli kaynak
     // sayildigi icin tarayicilar capraz-kaynak cerezleri kisitlayabiliyor.
     // Token'i kendimiz saklayip her istekte Authorization basligiyla yolluyoruz.
-    state.agent = { username: data.username, token: data.token };
+    state.agent = { username: data.username, fullName: data.fullName || data.username, token: data.token };
     els.agentUsernameLabel.textContent = data.username;
     els.agentUsernameLabel2.textContent = data.username;
+    try {
+      localStorage.setItem(LAST_AGENT_USERNAME_KEY, data.username);
+    } catch {
+      // hatirlanamazsa sorun degil
+    }
     els.agentPasswordInput.value = '';
     if (state.pendingDeepLink) {
       const pending = state.pendingDeepLink;
@@ -718,6 +724,17 @@ function goToHeroSlide(index) {
 function restartHeroAutoplay() {
   if (heroState.timer) clearInterval(heroState.timer);
   heroState.timer = setInterval(() => showHeroSlide(heroState.index + 1), HERO_AUTOPLAY_MS);
+}
+
+// Oturum baslayinca slayt ekrani gorunmez; arka planda donmeye ve (video
+// slaytlar varsa) oynamaya devam etmesi ekran paylasimi/kodlama ile ayni
+// islemciyi gereksiz yere paylasiyordu. Oturum bitince geri baslatilir.
+function stopHeroAutoplay() {
+  if (heroState.timer) {
+    clearInterval(heroState.timer);
+    heroState.timer = null;
+  }
+  els.heroSlidesContainer.querySelectorAll('.hero-slide-video').forEach((v) => v.pause());
 }
 
 els.heroPrevBtn.addEventListener('click', () => goToHeroSlide(heroState.index - 1));
@@ -1145,7 +1162,10 @@ function startConnection(ctx, sessionId, roomCode, serverUrl) {
 
   ws.onopen = () => {
     log('Sinyal sunucusuna bağlandı, odaya katılınıyor...');
-    ws.send(JSON.stringify({ type: 'join', roomCode, role: state.role }));
+    // Personelin gorunen adi musteriye "kim baglaniyor" diye gosterilir.
+    const displayName =
+      state.role === 'viewer' && state.agent ? state.agent.fullName || state.agent.username || '' : '';
+    ws.send(JSON.stringify({ type: 'join', roomCode, role: state.role, name: displayName }));
   };
 
   ws.onclose = () => {
@@ -1163,13 +1183,13 @@ function startConnection(ctx, sessionId, roomCode, serverUrl) {
         log(`Odaya katılındı (rol: ${msg.role}). Şu anda odada ${msg.peers} başka katılımcı var.`);
         await setupPeerConnection(ctx, sessionId);
         if (state.role === 'host' && msg.peers > 0) {
-          await startHostOffer(ctx, sessionId);
+          await hostConsentThenOffer(ctx, sessionId, msg.peerName);
         }
         break;
 
       case 'peer-joined':
         log(`Karşı taraf odaya katıldı (rol: ${msg.role}).`);
-        if (state.role === 'host') await startHostOffer(ctx, sessionId);
+        if (state.role === 'host') await hostConsentThenOffer(ctx, sessionId, msg.name);
         break;
 
       case 'peer-left':
@@ -1960,6 +1980,110 @@ function sendCaptureStatus(ctx, active, detail) {
   }
 }
 
+// --------------------------- Musteri onayi (ekran goruntuleme + kontrol) ---------------------------
+//
+// Destek personeli odaya girince, ekran paylasimi BASLAMADAN once musteriye
+// aydinlatma + onay penceresi gosterilir. Ekran goruntuleme ve uzaktan kontrol
+// AYRI onaylardir; kontrol kutusu varsayilan isaretsizdir. Kontrol durumu ana
+// surecte (main.js) tutulur ve girdi enjeksiyonunun tek kapisidir; buradaki
+// allowControlCheckbox sadece renderer tarafi on-filtresidir.
+
+let consentResolver = null;
+
+function askHostConsent(agentName) {
+  return new Promise((resolve) => {
+    // Onceki bir bekleyen onay varsa (olmamasi gerekir) reddedilmis say.
+    if (consentResolver) consentResolver('deny');
+    consentResolver = resolve;
+    els.consentAgentName.textContent = agentName || 'Bir destek personeli';
+    els.consentViewCheckbox.checked = false;
+    els.consentControlCheckbox.checked = false;
+    els.consentControlCheckbox.disabled = true;
+    els.consentAcceptBtn.disabled = true;
+    els.consentOverlay.classList.remove('hidden');
+    els.consentDenyBtn.focus();
+  });
+}
+
+function settleHostConsent(decision) {
+  els.consentOverlay.classList.add('hidden');
+  const resolve = consentResolver;
+  consentResolver = null;
+  if (resolve) resolve(decision);
+}
+
+els.consentViewCheckbox.addEventListener('change', () => {
+  const viewOk = els.consentViewCheckbox.checked;
+  els.consentAcceptBtn.disabled = !viewOk;
+  els.consentControlCheckbox.disabled = !viewOk;
+  // Ekran onayi geri alinirsa kontrol onayi da duser (kontrol, goruntulemeyi gerektirir).
+  if (!viewOk) els.consentControlCheckbox.checked = false;
+});
+els.consentAcceptBtn.addEventListener('click', () => {
+  if (!els.consentViewCheckbox.checked) return;
+  settleHostConsent(els.consentControlCheckbox.checked ? 'control' : 'view');
+});
+els.consentDenyBtn.addEventListener('click', () => settleHostConsent('deny'));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && consentResolver) settleHostConsent('deny');
+});
+
+function showHostAccessBadge(agentName, controlAllowed) {
+  const who = agentName || 'Destek personeli';
+  els.hostAccessBadge.classList.remove('hidden');
+  els.hostAccessBadge.classList.toggle('control', controlAllowed);
+  els.hostAccessText.textContent = controlAllowed
+    ? `${who} şu an bilgisayarınızı kontrol ediyor`
+    : `${who} ekranınızı görüntülüyor`;
+  els.revokeControlBtn.classList.toggle('hidden', !controlAllowed);
+}
+
+function hideHostAccessBadge() {
+  els.hostAccessBadge.classList.add('hidden');
+  els.hostAccessBadge.classList.remove('control');
+  els.revokeControlBtn.classList.add('hidden');
+}
+
+function sendControlState(ctx) {
+  if (ctx.controlChannel && ctx.controlChannel.readyState === 'open') {
+    ctx.controlChannel.send(JSON.stringify({ type: 'control-state', allowed: !!(ctx.consent && ctx.consent.control) }));
+  }
+}
+
+els.revokeControlBtn.addEventListener('click', async () => {
+  const ctx = state; // host tek oturumlu: state bu oturumun ctx'i
+  await window.nexuson.setControlConsent(false);
+  els.allowControlCheckbox.checked = false;
+  if (ctx.consent) ctx.consent.control = false;
+  showHostAccessBadge(ctx.consent && ctx.consent.name, false);
+  sendControlState(ctx);
+  log('Uzaktan kontrol iznini geri aldınız.');
+});
+
+async function hostConsentThenOffer(ctx, sessionId, peerName) {
+  if (ctx.consentPending || ctx.consent) return; // ayni oturumda ikinci kez sorma
+  ctx.consentPending = true;
+  log(`${peerName || 'Destek personeli'} bağlanmak istiyor, onayınız bekleniyor...`);
+  const decision = await askHostConsent(peerName);
+  ctx.consentPending = false;
+
+  // Onay beklenirken karsi taraf ayrildi / oturum kapandiysa devam etme.
+  if (!ctx.ws || ctx.disconnecting) return;
+
+  if (decision === 'deny') {
+    await window.nexuson.setControlConsent(false);
+    disconnectSession(ctx, sessionId, 'Bağlantı isteğini reddettiniz.');
+    return;
+  }
+
+  ctx.consent = { name: peerName || '', control: decision === 'control' };
+  await window.nexuson.setControlConsent(decision === 'control');
+  els.allowControlCheckbox.checked = decision === 'control';
+  showHostAccessBadge(peerName, decision === 'control');
+  log(decision === 'control' ? 'Ekran görüntüleme ve kontrol onaylandı.' : 'Yalnızca ekran görüntüleme onaylandı.');
+  await startHostOffer(ctx, sessionId);
+}
+
 async function startHostOffer(ctx, sessionId) {
   const pc = ctx.pc;
 
@@ -2098,6 +2222,7 @@ async function handleOffer(ctx, msg) {
 let viewerInputCaptureBound = false;
 
 function showSessionPanel() {
+  stopHeroAutoplay();
   els.setupPanel.classList.add('hidden');
   els.sessionPanel.classList.remove('hidden');
   els.fileMenuBtn.classList.remove('hidden');
@@ -2238,6 +2363,14 @@ function disconnectSession(ctx, sessionId, reason) {
       els.hostErrorText.classList.remove('hidden');
     }
     els.remoteVideo.srcObject = null;
+    // Onay penceresi acikken baglanti koptuysa kapat; her durumda kontrol izni
+    // ve rozet sifirlanir (bir sonraki oturum yeniden onay ister).
+    if (consentResolver) settleHostConsent('deny');
+    ctx.consent = null;
+    ctx.consentPending = false;
+    els.allowControlCheckbox.checked = false;
+    hideHostAccessBadge();
+    window.nexuson.setControlConsent(false);
     resetUIToSetup(reason);
   } else {
     // Destek ekibi tarafi: sadece bu sekmeyi kapat, digerleri etkilenmez.
@@ -2274,6 +2407,10 @@ function afterViewerSessionClosed(sessionId, reason) {
 function resetUIToSetup(reason) {
   els.sessionPanel.classList.add('hidden');
   els.setupPanel.classList.remove('hidden');
+  if (heroState.slides.length > 0) {
+    showHeroSlide(heroState.index);
+    restartHeroAutoplay();
+  }
   els.hostPlaceholder.classList.add('hidden');
   els.controlHint.classList.add('hidden');
   els.remoteCursorDot.classList.add('hidden');
@@ -2417,6 +2554,9 @@ function bindControlChannel(ctx, channel) {
     // bilgiyi otomatik olarak karsi tarafa (destek personeline) gonderiyoruz
     // - musteriye hicbir zaman hicbir sey sorulmadan.
     if (state.role === 'host') {
+      // Musterinin verdigi kontrol iznini personelin arayuzune de bildir
+      // (izin yoksa "yalnizca goruntuleme" gosterir, bos yere girdi gondermez).
+      sendControlState(ctx);
       window.nexuson.getSystemInfo()
         .then((info) => {
           if (channel.readyState === 'open') {
@@ -2445,6 +2585,18 @@ function bindControlChannel(ctx, channel) {
     if (evt.type === 'input-error') {
       // Bu mesaji sadece destek ekibi (viewer) gorur - host'un kendi gonderdigi hata.
       if (state.role !== 'host') log(`Karşı taraf uzaktan girdiyi uygulayamadı: ${evt.message}`);
+      return;
+    }
+
+    if (evt.type === 'control-state') {
+      // Sadece destek personeli (viewer) tarafinda anlamli: musteri kontrole
+      // izin vermediyse / izni geri aldiysa personel bunu gorur.
+      if (state.role !== 'host') {
+        els.controlHint.textContent = evt.allowed
+          ? 'Kontrol için ekrana tıklayın'
+          : 'Yalnızca görüntüleme — müşteri kontrole izin vermedi';
+        log(evt.allowed ? 'Müşteri uzaktan kontrole izin verdi.' : 'Uzaktan kontrol yok: müşteri yalnızca görüntülemeye izin verdi.');
+      }
       return;
     }
 

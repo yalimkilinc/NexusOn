@@ -71,14 +71,43 @@ if (!gotSingleInstanceLock) {
 // Gecici tanilama loglamasi: donma/yavaslik sorununu somut veriyle teshis
 // etmek icin. Sorun cozulup dogrulanana kadar burada kalacak.
 const DEBUG_LOG_PATH = path.join(os.tmpdir(), 'nexuson-debug.log');
-function debugLog(msg) {
-  try {
-    const line = `[${new Date().toISOString()}] ${msg}\n`;
-    fs.appendFileSync(DEBUG_LOG_PATH, line);
-  } catch {
-    // loglama basarisiz olsa bile uygulamanin geri kalani calismaya devam etsin
-  }
+// Satirlar bellekte biriktirilip asenkron yazilir: her satirda appendFileSync
+// ana sureci (DXGI/uzaktan girdi IPC'sini de servis eden is parcacigi)
+// bloke ediyordu. Surec kapanirken kalan tampon senkron yazilir.
+let debugLogBuffer = [];
+let debugLogWriting = false;
+let debugLogTimer = null;
+
+function scheduleDebugLogFlush() {
+  if (debugLogTimer || debugLogWriting) return;
+  debugLogTimer = setTimeout(flushDebugLog, 250);
 }
+
+function flushDebugLog() {
+  debugLogTimer = null;
+  if (debugLogWriting || debugLogBuffer.length === 0) return;
+  const chunk = debugLogBuffer.join('');
+  debugLogBuffer = [];
+  debugLogWriting = true;
+  fs.appendFile(DEBUG_LOG_PATH, chunk, () => {
+    // yazma basarisiz olsa bile uygulamanin geri kalani calismaya devam etsin
+    debugLogWriting = false;
+    if (debugLogBuffer.length > 0) scheduleDebugLogFlush();
+  });
+}
+
+function debugLog(msg) {
+  debugLogBuffer.push(`[${new Date().toISOString()}] ${msg}\n`);
+  scheduleDebugLogFlush();
+}
+
+process.on('exit', () => {
+  try {
+    if (debugLogBuffer.length > 0) fs.appendFileSync(DEBUG_LOG_PATH, debugLogBuffer.join(''));
+  } catch {
+    // kapanista yazilamazsa yapacak bir sey yok
+  }
+});
 ipcMain.on('debug-log', (_e, msg) => debugLog(String(msg)));
 
 // ONEMLI: webPreferences.backgroundThrottling=false SADECE JS zamanlayicilarini
@@ -146,7 +175,10 @@ function createWindow() {
     mainWindow.webContents.once('did-finish-load', () => handleDeepLinkUrl(coldStartUrl));
   }
 
-  if (process.env.NEXUSGO_AUTOSCRIPT) {
+  // GUVENLIK: ortam degiskeniyle rastgele JS calistiran bu test kancasi
+  // yalnizca gelistirme modunda (paketlenmemis) etkin olmali; kurulu uygulamada
+  // ayni ortam degiskeni musteri makinesinde kod calistirmak icin kullanilamasin.
+  if (!app.isPackaged && process.env.NEXUSGO_AUTOSCRIPT) {
     const delay = Number(process.env.NEXUSGO_AUTODELAY) || 2000;
     mainWindow.webContents.on('did-finish-load', () => {
       setTimeout(() => {
@@ -587,7 +619,28 @@ function sendToNutWorker(evt, timeoutMs = 3000) {
   });
 }
 
+// Uzaktan kontrol onayi (musteri tarafi). Onay durumu BURADA, ana surecte
+// tutulur ve fare/klavye enjeksiyonunun tek kapisi budur: renderer'in kendi
+// bayragi (checkbox vb.) ne olursa olsun, musteri kontrolu onaylamadiysa
+// 'remote-input' hicbir sey enjekte etmez. Varsayilan: KAPALI.
+let controlConsent = false;
+let lastDeniedInputLog = 0;
+
+ipcMain.handle('consent-set-control', (_e, allowed) => {
+  controlConsent = allowed === true;
+  debugLog(`[consent] uzaktan kontrol izni: ${controlConsent ? 'VERILDI' : 'YOK'}`);
+  return controlConsent;
+});
+
 ipcMain.handle('remote-input', async (_e, evt) => {
+  if (!controlConsent) {
+    const now = Date.now();
+    if (now - lastDeniedInputLog > 5000) {
+      lastDeniedInputLog = now;
+      debugLog('[consent] uzaktan girdi REDDEDILDI - musteri kontrole izin vermedi');
+    }
+    return;
+  }
   try {
     await sendToNutWorker(evt);
   } catch (err) {

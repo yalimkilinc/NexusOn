@@ -29,7 +29,7 @@ router.post('/agent-login', agentLoginRateLimit, (req, res) => {
   }
 
   const token = createToken(agent.id, agent.username);
-  res.json({ ok: true, username: agent.username, token });
+  res.json({ ok: true, username: agent.username, fullName: agent.full_name || agent.username, token });
 });
 
 router.post('/agent-logout', requireAgentToken, (req, res) => {
@@ -37,9 +37,12 @@ router.post('/agent-logout', requireAgentToken, (req, res) => {
   res.json({ ok: true });
 });
 
-// Personel giris ekranindaki secim listesi icin (herkese acik - NexusOn
-// uygulamasi henuz giris yapmamis haldeyken cagirir). Sadece kimlik bilgisi
-// (kullanici kodu + ad) doner - sifre/telefon/e-posta ASLA donmez.
+// DEPRECATED (denetim E-2): NexusOn 1.1.2 ve sonrasi bu ucu KULLANMIYOR
+// (personel kullanici adini elle yazar). Giris yapmamis herkese personel
+// adlarini actigi icin, personelin hepsi 1.1.2+ surume gectikten sonra bu
+// route KALDIRILMALI. Eski surumler giris listesini buradan dolduruyordu, bu
+// yuzden erken silinirse guncellememis personel giris yapamaz.
+// Sadece kimlik bilgisi (kullanici kodu + ad) doner - sifre/telefon/e-posta ASLA donmez.
 router.get('/public/agents', (_req, res) => {
   const agents = db
     .prepare('SELECT username, full_name FROM agents ORDER BY COALESCE(full_name, username) ASC')

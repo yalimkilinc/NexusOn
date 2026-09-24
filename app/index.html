@@ -28,6 +28,10 @@
       </div>
       <button id="toggleLogBtn" class="link-btn hidden">Teknik Günlüğü Göster</button>
       <select id="screenSelect" class="screen-select hidden" title="Ekran seç"></select>
+      <div id="hostAccessBadge" class="access-badge hidden">
+        <span id="hostAccessText"></span>
+        <button id="revokeControlBtn" class="revoke-control-btn hidden" type="button">Kontrolü Kes</button>
+      </div>
       <button id="disconnectBtn" class="danger-btn hidden">Bağlantıyı Kes</button>
       <div id="statusBadge" class="status status-disconnected">Bağlı değil</div>
       <div id="windowControls" class="window-controls">
@@ -84,9 +88,7 @@
         <div id="agentLogin" class="role-setup hidden">
           <p class="hint">Devam etmek için personel hesabınızla giriş yapın.</p>
           <div class="field-row">
-            <select id="agentUsernameInput" autocomplete="username">
-              <option value="" disabled selected>Kullanıcınızı seçin</option>
-            </select>
+            <input id="agentUsernameInput" type="text" placeholder="Kullanıcı adı" autocomplete="username" spellcheck="false" />
           </div>
           <div class="field-row">
             <input id="agentPasswordInput" type="password" placeholder="Şifre" autocomplete="current-password" />
@@ -190,7 +192,10 @@
         <video id="remoteVideo" autoplay playsinline></video>
         <div id="hostPlaceholder" class="host-placeholder hidden">
           <p>Ekranınız karşı tarafla paylaşılıyor.</p>
-          <input type="checkbox" id="allowControlCheckbox" checked class="hidden" />
+          <!-- Kontrol izni: varsayilan KAPALI; sadece musteri onay penceresinde
+               (consentOverlay) acikca isaretlerse acilir. Ana surec de ayrica
+               kontrol eder (main.js consent-set-control). -->
+          <input type="checkbox" id="allowControlCheckbox" class="hidden" />
         </div>
         <div id="controlHint" class="control-hint hidden">Kontrol için ekrana tıklayın</div>
         <div id="remoteCursorDot" class="remote-cursor-dot hidden">
@@ -204,6 +209,38 @@
     <div class="log-header">Bağlantı Günlüğü</div>
     <div id="logBox" class="log-box"></div>
   </footer>
+
+  <!-- Musteri (host): destek personeli baglanmak istediginde, ekran paylasimi
+       BASLAMADAN once gosterilen aydinlatma + onay penceresi. Ekran goruntuleme
+       ve uzaktan kontrol AYRI onaylardir; kontrol kutusu varsayilan isaretsizdir. -->
+  <div id="consentOverlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="consentTitle">
+    <div class="modal-card consent-card">
+      <h3 id="consentTitle">Destek Bağlantısı İsteği</h3>
+      <p class="consent-who"><strong id="consentAgentName"></strong> bilgisayarınıza bağlanmak istiyor.</p>
+      <ul class="consent-list">
+        <li><b>Ne paylaşılıyor:</b> Ekranınız, bağlantı süresince <b>canlı</b> olarak karşı tarafa aktarılır. Ekranda o an açık olan tüm pencereler ve üçüncü kişilere ait bilgiler (müşteri adı, telefon, TCKN, cari bakiye vb.) destek personeli tarafından görülebilir.</li>
+        <li><b>Ne kadar sürüyor:</b> Siz veya destek personeli bağlantıyı sonlandırana kadar. Üst çubuktaki <b>"Bağlantıyı Kes"</b> düğmesiyle istediğiniz an, gerekçe göstermeden kesebilirsiniz.</li>
+        <li><b>Kayıt:</b> Oturum görüntü/ses olarak <b>kaydedilmez</b>. Yalnızca bağlantının başlama/bitiş saati, süresi ve destek personelinin girdiği kısa not tutulur.</li>
+        <li><b>Nasıl taşınıyor:</b> Görüntü uçtan uca şifrelenir. Bazı ağlarda üçüncü taraf bir aktarım (TURN) sunucusu kullanılabilir; bu durumda şifreli veri o sunucu üzerinden geçer.</li>
+      </ul>
+      <label class="checkbox-row">
+        <input type="checkbox" id="consentViewCheckbox" />
+        <span>Bilgileri okudum, ekranımın destek personeli tarafından görüntülenmesini kabul ediyorum.</span>
+      </label>
+      <div class="consent-control">
+        <h4>Bilgisayarınızın Kontrolü (isteğe bağlı)</h4>
+        <p class="hint">Ekranınızı paylaşmanız, karşı tarafa bilgisayarınızı kullanma izni vermez. İzin verirseniz destek personeli sizin yerinize tıklayabilir, yazı yazabilir, dosya açabilir. Parola, TCKN gibi hassas bilgileri kendiniz yazmanız önerilir. Bu izni istediğiniz an üst çubuktaki <b>"Kontrolü Kes"</b> ile geri alabilirsiniz.</p>
+        <label class="checkbox-row">
+          <input type="checkbox" id="consentControlCheckbox" disabled />
+          <span>Destek personelinin bilgisayarımı fare ve klavye ile kontrol etmesine izin veriyorum.</span>
+        </label>
+      </div>
+      <div class="consent-actions">
+        <button id="consentAcceptBtn" class="primary-btn" disabled>Onayla ve Bağlan</button>
+        <button id="consentDenyBtn" class="secondary-btn">Reddet</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Destek ekibi bir gorusmeyi bitirdiginde doldurdugu kapanis formu -->
   <div id="closingFormOverlay" class="modal-overlay hidden">
@@ -327,7 +364,10 @@
         NexusOn, Ab Yazılım tarafından geliştirilmiş bir uzaktan destek ve ekran paylaşımı uygulamasıdır.
       </p>
       <div style="display:flex; gap:10px;">
-        <button id="aboutSecurityLinkBtn" class="primary-btn" type="button">Güvenlik ve KVKK Bilgilendirmesi</button>
+        <!-- GIZLI (denetim E-6): guvenlik.html icindeki [BELGE-NO], [Mersis No], [X yil] gibi
+             sirket bilgisi alanlari doldurulana kadar musteriye gosterilmiyor. Alanlar
+             doldurulunca "hidden" sinifini kaldirin. -->
+        <button id="aboutSecurityLinkBtn" class="primary-btn hidden" type="button">Güvenlik ve KVKK Bilgilendirmesi</button>
         <button id="aboutCloseBtn" class="secondary-btn" type="button">Kapat</button>
       </div>
     </div>

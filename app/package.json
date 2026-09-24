@@ -1,13 +1,13 @@
 {
   "name": "nexuson",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "private": true,
   "description": "NexusOn - musteri bilgisayarlarina uzaktan destek uygulamasi (Windows).",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dist": "node scripts/set-variant.js customer && electron-builder --win",
-    "dist:staff": "node scripts/set-variant.js staff && electron-builder --win -c.win.artifactName=${productName}-Personel-Setup-${version}.${ext} & node scripts/set-variant.js customer"
+    "dist:staff": "node scripts/dist-staff.js"
   },
   "devDependencies": {
     "electron": "^32.0.0",
