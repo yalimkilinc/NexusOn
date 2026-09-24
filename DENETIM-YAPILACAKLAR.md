@@ -15,11 +15,11 @@ Her madde bağımsızdır, sırayla yapılması zorunlu değildir.
 | A-1 | Yapıldı. VPS'te `SESSION_SECRET` tanımlı. Kodda sabit yedek kaldırıldı, varsayılan `admin123` yok. Admin parolasının `admin123` olup olmadığı kontrol edilmedi (parola özeti karşılaştırması yapılmadı). |
 | A-2 | Sorun yok. `wss://nexuson-sinyal.novrixon.com.tr` Caddy üzerinden geçerli sertifikayla çalışıyor, 3003/7777 dışarıdan kapalı. |
 | B | Yapıldı ve canlıda. 6 senaryo yerelde ve canlı `wss://` üzerinde geçti. |
-| C-1/2/3 | Kodda yapıldı (1.1.2/1.2.0). **Gerçek müşteri logu henüz alınmadı**, çünkü yeni sürüm müşteriye ulaşmadı. |
+| C-1/2/3 | Kodda yapıldı ve 1.2.0 ile yayında. **Gerçek müşteri logu bekleniyor** (müşteri güncelleyip bir oturum açınca). |
 | D | Yapıldı (1.2.0), Electron'da uçtan uca test edildi. Onay metni taslaktır, hukuk onayı gerekir. |
 | E-1 | Yapıldı (+ aynı dosyadaki iki `innerHTML` daha). |
 | E-2 | İstemci kısmı yapıldı. **Sunucu ucu (`/api/public/agents`) bilerek duruyor**; tüm personel 1.2.0'a geçince silinmeli. |
-| E-3 | `version.json` şu an 1.1.1. 1.2.0 yayınlanınca güncellenecek. |
+| E-3 | Yapıldı. 24 Eylül 2026 itibarıyla `version.json` 1.2.0, iki kurulum dosyası yayında. |
 | E-4 | Yapıldı. Asıl sorun `&` yüzünden derleme hatasının başarılı görünmesiydi, `scripts/dist-staff.js` çıkış kodunu koruyor. |
 | E-5, E-9, E-10 | Yapıldı. |
 | E-6 | Bağlantı gizlendi. Placeholder'ları (belge no, Mersis, saklama süreleri...) şirket bilgileriyle doldurmak sizde. |
@@ -304,7 +304,7 @@ Bu aynı zamanda KVKK bulgusu #1 ve #2'yi de kapatıyor.
 |---|---|---|
 | E-1 | `innerHTML` → `textContent` (depolanmış XSS) | `admin-panel\public\mobile.js:594-601` |
 | E-2 | `/api/public/agents` kaldır veya kimlik doğrulaması arkasına al | `admin-panel\server\routes\agents.js:43` |
-| E-3 | `version.json`'ı `1.1.1`'e güncelle — **güncellemeler müşteriye ulaşmıyor** | `admin-panel\server\downloads\version.json` |
+| E-3 | Yapıldı. 24 Eylül 2026 itibarıyla `version.json` 1.2.0, iki kurulum dosyası yayında. |
 | E-4 | `dist:staff` script'inde `&` → `&&` | `app\package.json:10` |
 | E-5 | `NEXUSGO_AUTOSCRIPT` kancasını `if (!app.isPackaged)` içine al | `app\main.js:149-157` |
 | E-6 | `guvenlik.html`'deki `[BELGE-NO]`, `[Mersis No]`, `[X yıl]` placeholder'larını doldur veya linki gizle | `admin-panel\public\guvenlik.html` |
