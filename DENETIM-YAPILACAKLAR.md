@@ -8,6 +8,35 @@ Her madde bağımsızdır, sırayla yapılması zorunlu değildir.
 
 ---
 
+## DURUM (2026-09-24)
+
+| Madde | Durum |
+|---|---|
+| A-1 | Yapıldı. VPS'te `SESSION_SECRET` tanımlı. Kodda sabit yedek kaldırıldı, varsayılan `admin123` yok. Admin parolasının `admin123` olup olmadığı kontrol edilmedi (parola özeti karşılaştırması yapılmadı). |
+| A-2 | Sorun yok. `wss://nexuson-sinyal.novrixon.com.tr` Caddy üzerinden geçerli sertifikayla çalışıyor, 3003/7777 dışarıdan kapalı. |
+| B | Yapıldı ve canlıda. 6 senaryo yerelde ve canlı `wss://` üzerinde geçti. |
+| C-1/2/3 | Kodda yapıldı (1.1.2/1.2.0). **Gerçek müşteri logu henüz alınmadı**, çünkü yeni sürüm müşteriye ulaşmadı. |
+| D | Yapıldı (1.2.0), Electron'da uçtan uca test edildi. Onay metni taslaktır, hukuk onayı gerekir. |
+| E-1 | Yapıldı (+ aynı dosyadaki iki `innerHTML` daha). |
+| E-2 | İstemci kısmı yapıldı. **Sunucu ucu (`/api/public/agents`) bilerek duruyor**; tüm personel 1.2.0'a geçince silinmeli. |
+| E-3 | `version.json` şu an 1.1.1. 1.2.0 yayınlanınca güncellenecek. |
+| E-4 | Yapıldı. Asıl sorun `&` yüzünden derleme hatasının başarılı görünmesiydi, `scripts/dist-staff.js` çıkış kodunu koruyor. |
+| E-5, E-9, E-10 | Yapıldı. |
+| E-6 | Bağlantı gizlendi. Placeholder'ları (belge no, Mersis, saklama süreleri...) şirket bilgileriyle doldurmak sizde. |
+| E-7, E-8 | Yapıldı. |
+| F | Ölçüm bekliyor, aşağıdaki karar tablosuna bakın. |
+
+### F için karar tablosu (C-3 logundan)
+
+| Logda görülen | Anlamı | Sonraki iş |
+|---|---|---|
+| `YOL=TURN RELAY` | Trafik Metered.ca üzerinden akıyor (bant/gecikme dışarıda) | Öncelik: kendi TURN sunucusu (`turn-server\`), Türkiye VPS'inde |
+| `YOL=P2P` ve `qualityLimitationReason=bandwidth` | Doğrudan ama hat dar | Bitrate/çözünürlük adaptasyonu, kalite rozeti |
+| `encoderImplementation=OpenH264/libvpx` ve `qualityLimitationReason=cpu` | Yazılım kodlayıcı CPU'yu yiyor | DXGI kare hattı (kopya sayısı), donanım kodlayıcı tercihi |
+| `framesPerSecond` hareketle düşmüyor | C-1 işe yaradı | F'deki hat işleri ertelenebilir |
+
+---
+
 ## A. Önce siz doğrulayın (kod işi değil, sunucuda bakılacak)
 
 Bu ikisini ben kod okuyarak belirleyemiyorum, sunucuya bakmak gerekiyor.
