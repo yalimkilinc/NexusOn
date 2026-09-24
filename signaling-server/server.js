@@ -172,6 +172,13 @@ wss.on('connection', (ws, req) => {
 
       let room = rooms.get(roomCode);
       if (!room) {
+        // GUVENLIK: odayi yalnizca host yaratabilir. Viewer'in var olmayan bir
+        // odaya katilip onu yaratmasi, saldirganin oda kodlarini onceden isgal
+        // etmesine izin veriyordu.
+        if (role !== 'host') {
+          send(ws, { type: 'error', message: 'Oda bulunamadi. Musteriden guncel kodu isteyin.' });
+          return;
+        }
         room = new Set();
         rooms.set(roomCode, room);
         roomCreatedAt.set(roomCode, Date.now());
@@ -179,6 +186,15 @@ wss.on('connection', (ws, req) => {
       if (room.size >= 2) {
         send(ws, { type: 'error', message: 'Bu oda dolu (en fazla 2 kisi baglanabilir).' });
         return;
+      }
+      // GUVENLIK: bir odada ayni rolden iki katilimci olamaz. Bu kural olmadan
+      // saldirgan 'host' rolu iddia edip odayi onceden yaratabilir ve gercek
+      // musteri o odaya katildiginda ekranini saldirgana gonderir.
+      for (const peer of room) {
+        if (peer.role === role) {
+          send(ws, { type: 'error', message: 'Bu kod kullanimda. Lutfen yeni bir kod uretin.' });
+          return;
+        }
       }
 
       ws.roomCode = roomCode;

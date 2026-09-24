@@ -51,9 +51,19 @@ app.set('trust proxy', 'loopback');
 // hicbir islevsel faydasi yoktu - kapatildi.
 app.use(cors({ origin: true, credentials: false }));
 app.use(express.json());
+// GUVENLIK: kaynak koda gomulu sabit bir yedek anahtar, kodu gören herkesin
+// kendi admin cerezini imzalamasina izin verirdi. Ortam degiskeni yoksa
+// tahmin edilemez, surece ozel rastgele bir anahtar kullaniyoruz (yeniden
+// baslatmada oturumlar duser; uretimde SESSION_SECRET mutlaka tanimli olmali).
+let sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  sessionSecret = require('crypto').randomBytes(32).toString('hex');
+  console.warn('[NexusOn Admin] UYARI: SESSION_SECRET tanimli degil - gecici rastgele anahtar kullaniliyor, yeniden baslatmada admin oturumlari duser.');
+}
+
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'nexusgo-admin-panel-local-secret',
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 8 * 60 * 60 * 1000 }, // 8 saat

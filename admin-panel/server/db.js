@@ -202,15 +202,19 @@ if (!ticketColumns.includes('customer_note')) {
 }
 
 // Ilk calistirmada admin kullanicisi yoksa olustur.
-// Uretimde mutlaka ADMIN_USERNAME / ADMIN_PASSWORD ortam degiskenleriyle degistirin.
+// GUVENLIK: bilinen bir varsayilan parola (admin/admin123) yok. Ilk kurulumda
+// ADMIN_PASSWORD ortam degiskeni verilmezse admin olusturulmaz.
 const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admins').get().c;
 if (adminCount === 0) {
   const username = process.env.ADMIN_USERNAME || 'admin';
-  const password = process.env.ADMIN_PASSWORD || 'admin123';
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password) {
+    console.error('[NexusOn Admin] HATA: Hic admin kullanicisi yok ve ADMIN_PASSWORD tanimli degil. Ilk admini olusturmak icin ADMIN_PASSWORD (ve istege bagli ADMIN_USERNAME) ile baslatin.');
+    process.exit(1);
+  }
   const hash = bcrypt.hashSync(password, 10);
   db.prepare('INSERT INTO admins (username, password_hash) VALUES (?, ?)').run(username, hash);
-  console.log(`[NexusOn Admin] İlk admin kullanıcısı oluşturuldu -> kullanıcı adı: "${username}", şifre: "${password}"`);
-  console.log('[NexusOn Admin] UYARI: Üretimde bu varsayılan şifreyi mutlaka değiştirin (ADMIN_PASSWORD ortam değişkeni ile).');
+  console.log(`[NexusOn Admin] İlk admin kullanıcısı oluşturuldu -> kullanıcı adı: "${username}"`);
 }
 
 // Baslangicta hic haber/duyuru yoksa ornek birkac tane ekle (bos ekran gorunmesin).
