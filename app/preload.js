@@ -5,6 +5,8 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('nexuson', {
   appVersion: ipcRenderer.sendSync('get-app-version'),
+  tuning: ipcRenderer.sendSync('get-tuning'),
+  requestAttention: () => ipcRenderer.send('request-attention'),
 
   pickFileToSend: () => ipcRenderer.invoke('pick-file-to-send'),
   readFileChunk: (args) => ipcRenderer.invoke('read-file-chunk', args),

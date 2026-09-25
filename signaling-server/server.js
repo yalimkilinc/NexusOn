@@ -268,6 +268,13 @@ wss.on('connection', (ws, req) => {
     }
 
     // SDP teklif/cevap ve ICE adaylarini oldugu gibi karsi tarafa ilet
+    // Host'un personele ilettigi durum bildirimi (or. 'musteri onayi bekleniyor').
+    if (msg.type === 'host-status') {
+      if (!ws.roomCode || ws.role !== 'host') return;
+      broadcastToRoom(ws, { type: 'host-status', state: String(msg.state || '').slice(0, 32) });
+      return;
+    }
+
     if (msg.type === 'offer' || msg.type === 'answer' || msg.type === 'ice-candidate') {
       if (!ws.roomCode) return; // odaya katilmamis soket hicbir sey iletemez
       // Roller: offer'i yalnizca host, answer'i yalnizca viewer uretir. Aksi halde

@@ -110,6 +110,32 @@ process.on('exit', () => {
 });
 ipcMain.on('debug-log', (_e, msg) => debugLog(String(msg)));
 
+// Ayar dosyasi (%APPDATA%\nexuson\tuning.json): yeniden derlemeden, gercek
+// musteri makinesinde yakalama/kodlama ayarlarini A/B denemek icin. Dosya yoksa
+// ya da gecersizse VARSAYILANLAR (1.1.1'in sahada kanitlanmis davranisi) gecerli.
+//   contentHint     : '' (kapali, varsayilan) | 'detail' | 'motion' | 'text'
+//   balancedEncoder : false (varsayilan: maintain-resolution, 2,5 Mbps) | true (balanced, 8 Mbps, 30 fps)
+//   diagnostics     : true (varsayilan) ek istatistik/gorunurluk loglari
+const TUNING_DEFAULTS = { contentHint: '', balancedEncoder: false, diagnostics: true };
+function loadTuning() {
+  const t = { ...TUNING_DEFAULTS };
+  try {
+    const raw = fs.readFileSync(path.join(app.getPath('userData'), 'tuning.json'), 'utf8').replace(/^\uFEFF/, '');
+    const u = JSON.parse(raw);
+    if (typeof u.contentHint === 'string' && ['', 'detail', 'motion', 'text'].includes(u.contentHint)) t.contentHint = u.contentHint;
+    if (typeof u.balancedEncoder === 'boolean') t.balancedEncoder = u.balancedEncoder;
+    if (typeof u.diagnostics === 'boolean') t.diagnostics = u.diagnostics;
+  } catch {
+    // dosya yok/bozuk: varsayilanlar
+  }
+  return t;
+}
+const tuning = loadTuning();
+debugLog(`[tuning] ${JSON.stringify(tuning)} surum=${app.getVersion()}`);
+ipcMain.on('get-tuning', (event) => {
+  event.returnValue = tuning;
+});
+
 // ONEMLI: webPreferences.backgroundThrottling=false SADECE JS zamanlayicilarini
 // (setTimeout/rAF) etkiler. Pencere kucultulunce (minimize/occluded) Chromium
 // ayrica renderer surecinin kendisini ve video/agi (WebRTC dahil) de ayri bir
@@ -375,6 +401,24 @@ app.on('render-process-gone', (_e, _webContents, details) => {
 // dizini, orada package.json yok) ve sessizce basarisiz oluyordu. Electron'un
 // kendi app.getVersion() metodu hem gelistirme hem paketlenmis derlemede dogru
 // calisir.
+// Musteri onay penceresi acilirken uygulama arka planda/kucukse (kasiyer baska
+// pencerede) onay penceresi hic gorunmuyor ve personel suresiz bekliyordu.
+// Onay istenmeden ONCE (ekran yakalama henuz baslamamisken) pencereyi one getir.
+ipcMain.on('request-attention', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  try {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    if (!mainWindow.isFocused()) {
+      mainWindow.flashFrame(true);
+      mainWindow.once('focus', () => mainWindow.flashFrame(false));
+    }
+  } catch {
+    // pencere o an yok olmus olabilir
+  }
+});
+
 ipcMain.on('get-app-version', (event) => {
   event.returnValue = app.getVersion();
 });

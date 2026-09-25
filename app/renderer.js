@@ -51,6 +51,14 @@ const rtcCertificatePromise = (typeof RTCPeerConnection !== 'undefined' && RTCPe
 // icin) erisilebilsin.
 const IS_STAFF_BUILD = window.NEXUSON_VARIANT === 'staff';
 
+// Yakalama/kodlama ayarlari (main.js loadTuning, %APPDATA%\nexuson\tuning.json).
+// Varsayilan = 1.1.1'in sahada kanitlanmis davranisi (contentHint yok,
+// maintain-resolution, 2,5 Mbps). A/B denemesi icin dosyadan degistirilir.
+const TUNING = window.nexuson.tuning || { contentHint: '', balancedEncoder: false, diagnostics: true };
+function applyContentHint(track) {
+  if (TUNING.contentHint) track.contentHint = TUNING.contentHint;
+}
+
 const CHUNK_SIZE = 16 * 1024; // 16 KB - veri kanali icin guvenli parca boyutu
 const HEADER_LEN = 8; // her binary dosya parcasinin basindaki transferId etiketi
 // NOT: "localhost" yalnizca sunucularla AYNI bilgisayarda calisir. Baska bir
@@ -1192,8 +1200,25 @@ function startConnection(ctx, sessionId, roomCode, serverUrl) {
         if (state.role === 'host') await hostConsentThenOffer(ctx, sessionId, msg.name);
         break;
 
+      case 'host-status': {
+        if (state.role === 'viewer') {
+          const texts = {
+            'consent-pending': "Müşterinin onayı bekleniyor... (müşteriye pencerede Onayla'ya basmasını söyleyin)",
+            'consent-denied': 'Müşteri bağlantı isteğini reddetti.',
+            'consent-timeout': 'Müşteri 2 dakika içinde onay vermedi. Yeni kod isteyin.',
+          };
+          const text = texts[msg.state];
+          if (text) {
+            log(text);
+            if (msg.state === 'consent-pending') setStatus('Müşteri onayı bekleniyor', 'connecting');
+            else ctx.hostStatusReason = text;
+          }
+        }
+        break;
+      }
+
       case 'peer-left':
-        disconnectSession(ctx, sessionId, 'Karşı taraf bağlantıyı kapattı.');
+        disconnectSession(ctx, sessionId, ctx.hostStatusReason || 'Karşı taraf bağlantıyı kapattı.');
         break;
 
       case 'offer':
@@ -1309,6 +1334,10 @@ async function setupPeerConnection(ctx, sessionId) {
   let prevJitter = null;
   let lastFramesEncoded = null;
   let stalledTicks = 0;
+  let lastWritten = 0; // DXGI'nin encoder'a yazdigi kare sayisi (statik ekran ayirimi icin)
+  let failedRecoveries = 0;
+  let stallReported = false;
+  const MAX_RECOVERIES = 2; // kurtarma sonuc vermiyorsa sonsuza dek tekrar denemeyiz
   const STALL_TICKS_BEFORE_RECOVERY = 3; // 3sn araliklarla ~9 saniye
   ctx.statsInterval = setInterval(async () => {
     if (!ctx.pc || ctx.pc !== pc) {
@@ -1337,6 +1366,18 @@ async function setupPeerConnection(ctx, sessionId) {
             totalEncodeTime: report.totalEncodeTime,
             framesEncoded: report.framesEncoded,
           };
+        }
+        if (TUNING.diagnostics && report.type === 'media-source' && report.kind === 'video') {
+          // Kaynak (generator/yakalama) kare uretiyor mu? framesEncoded ile birlikte
+          // "donma kaynakta mi encoder'da mi" sorusunu kesin ayirir.
+          window.nexuson.debugLog(
+            `[stats] KAYNAK: frames=${report.frames} fps=${report.framesPerSecond} gorunurluk=${document.visibilityState} dxgiYazilan=${state.dxgiFramesWritten || 0}`
+          );
+        }
+        if (TUNING.diagnostics && report.type === 'outbound-rtp' && report.kind === 'video') {
+          window.nexuson.debugLog(
+            `[stats] EK: framesSent=${report.framesSent} keyFrames=${report.keyFramesEncoded} encodeTime=${report.totalEncodeTime} pli=${report.pliCount} nack=${report.nackCount}`
+          );
         }
         if (report.type === 'inbound-rtp' && report.kind === 'video') {
           let windowedAvgMs = 'n/a';
@@ -1392,20 +1433,44 @@ async function setupPeerConnection(ctx, sessionId) {
       // (sadece tetiklenince degil) durumu logluyoruz - bir daha sessizce
       // basarisiz olursa en azindan NEDEN oldugunu gorebilelim.
       if (state.role === 'host' && selfSummary) {
+        const written = ctx.dxgiFramesWritten || 0;
+        // DXGI yolu aktifken kaynak yeni kare YAZMIYORSA ekran sabittir: encoder'a girdi
+        // yok, bu bir ariza degil (eskiden yanlis alarm veriyordu).
+        const sourceIdle = !!ctx.dxgiCaptureInterval && written === lastWritten;
+        lastWritten = written;
         if (lastFramesEncoded !== null && selfSummary.framesEncoded === lastFramesEncoded) {
-          stalledTicks++;
-          window.nexuson.debugLog(
-            `[capture] izci: framesEncoded degismedi (${selfSummary.framesEncoded}), stalledTicks=${stalledTicks}/${STALL_TICKS_BEFORE_RECOVERY} connectionState=${pc.connectionState}`
-          );
-          if (stalledTicks >= STALL_TICKS_BEFORE_RECOVERY) {
+          if (sourceIdle) {
             stalledTicks = 0;
+          } else {
+            stalledTicks++;
             window.nexuson.debugLog(
-              `[capture] framesEncoded ${STALL_TICKS_BEFORE_RECOVERY * 3} saniyedir sabit (${selfSummary.framesEncoded}) - izci kurtarmayi tetikliyor`
+              `[capture] izci: framesEncoded degismedi (${selfSummary.framesEncoded}), stalledTicks=${stalledTicks}/${STALL_TICKS_BEFORE_RECOVERY} connectionState=${pc.connectionState}`
             );
-            recoverStalledDisplayMediaCapture(ctx);
+            if (stalledTicks >= STALL_TICKS_BEFORE_RECOVERY) {
+              stalledTicks = 0;
+              failedRecoveries++;
+              if (failedRecoveries <= MAX_RECOVERIES) {
+                window.nexuson.debugLog(
+                  `[capture] framesEncoded ${STALL_TICKS_BEFORE_RECOVERY * 3} saniyedir sabit (${selfSummary.framesEncoded}) - izci kurtarmayi tetikliyor (${failedRecoveries}/${MAX_RECOVERIES})`
+                );
+                recoverStalledDisplayMediaCapture(ctx);
+              } else if (!stallReported) {
+                // Kurtarma sonuc vermedi: her 9 sn'de yakalamayi yeniden almak akisi
+                // duzeltmiyor, sadece yeni titremeler yaratiyordu. Birakip personele bildir.
+                stallReported = true;
+                window.nexuson.debugLog('[capture] kurtarma sonuc vermedi, tekrar denenmeyecek - personele "akis durdu" bildiriliyor');
+                sendCaptureStatus(ctx, 'stalled', 'Görüntü akışı durdu.');
+              }
+            }
           }
         } else {
           stalledTicks = 0;
+          failedRecoveries = 0;
+          if (stallReported) {
+            stallReported = false;
+            window.nexuson.debugLog('[capture] akis yeniden basladi');
+            sendCaptureStatus(ctx, ctx.dxgiCaptureInterval ? 'dxgi' : 'fallback', 'Görüntü akışı yeniden başladı.');
+          }
         }
         lastFramesEncoded = selfSummary.framesEncoded;
       }
@@ -1491,15 +1556,20 @@ function applyDxgiEncoderParams(ctx, sender) {
   if (ctx.dxgiNativeWidth && ctx.dxgiNativeHeight) {
     scaleResolutionDownBy = Math.max(1, ctx.dxgiNativeWidth / MAX_W, ctx.dxgiNativeHeight / MAX_H);
   }
-  // 'maintain-resolution' + 2,5 Mbps tavan, hareketli sahnede (pencere
-  // surukleme) kare hizini tek haneye dusuruyordu. 'balanced' cozunurluk ve
-  // kare hizini birlikte dengeler, tavan 8 Mbps'e cikarildi. getParameters()'tan
-  // gelen mevcut alanlar (active vb.) korunur.
+  // Varsayilan: 1.1.1'in kanitlanmis ayari ('maintain-resolution', 2,5 Mbps).
+  // C-1 denemesi ('balanced', 8 Mbps, 30 fps) tuning.json'daki balancedEncoder
+  // ile acilir; sahada donma sorununun kaynagi olup olmadigi olculene kadar
+  // varsayilan degil. getParameters()'tan gelen mevcut alanlar (active vb.) korunur.
   const params = sender.getParameters();
-  params.degradationPreference = 'balanced';
   if (!params.encodings || !params.encodings.length) params.encodings = [{}];
-  params.encodings[0].maxBitrate = 8_000_000;
-  params.encodings[0].maxFramerate = 30;
+  if (TUNING.balancedEncoder) {
+    params.degradationPreference = 'balanced';
+    params.encodings[0].maxBitrate = 8_000_000;
+    params.encodings[0].maxFramerate = 30;
+  } else {
+    params.degradationPreference = 'maintain-resolution';
+    params.encodings[0].maxBitrate = 2_500_000;
+  }
   params.encodings[0].scaleResolutionDownBy = scaleResolutionDownBy;
   sender
     .setParameters(params)
@@ -1627,7 +1697,7 @@ async function recoverStalledDisplayMediaCapture(ctx) {
   try {
     const freshStream = await navigator.mediaDevices.getDisplayMedia(fallbackDisplayMediaConstraints());
     const freshTrack = freshStream.getVideoTracks()[0];
-    freshTrack.contentHint = 'detail';
+    applyContentHint(freshTrack);
     if (ctx.dxgiSender) {
       await ctx.dxgiSender.replaceTrack(freshTrack);
       window.nexuson.debugLog('[capture] izci kurtarmasi basarili (replaceTrack)');
@@ -1666,7 +1736,7 @@ async function startDxgiCapture(ctx, targetFps) {
 
   let generator = new MediaStreamTrackGenerator({ kind: 'video' });
   // Bos birakilirsa WebRTC icerigi kamera sanip ekran optimizasyonlarini kapatir.
-  generator.contentHint = 'detail';
+  applyContentHint(generator);
   let writer = generator.writable.getWriter();
   const outStream = new MediaStream([generator]);
 
@@ -1681,7 +1751,7 @@ async function startDxgiCapture(ctx, targetFps) {
       // eski yazici zaten bozulmus olabilir, onemli degil
     }
     generator = new MediaStreamTrackGenerator({ kind: 'video' });
-    generator.contentHint = 'detail';
+    applyContentHint(generator);
     writer = generator.writable.getWriter();
     if (ctx.dxgiSender) {
       try {
@@ -1734,6 +1804,7 @@ async function startDxgiCapture(ctx, targetFps) {
     });
     try {
       await writer.write(videoFrame);
+      ctx.dxgiFramesWritten = (ctx.dxgiFramesWritten || 0) + 1;
     } catch (err) {
       // yazma sirasinda beklenmedik BASKA bir hata (ornegin tam bu anda
       // akis kapandi) - guvenli tarafta kalip yine de kurtarmayi dene.
@@ -1816,7 +1887,7 @@ async function startDxgiCapture(ctx, targetFps) {
     try {
       const fallbackStream = await navigator.mediaDevices.getDisplayMedia(fallbackDisplayMediaConstraints());
       const fallbackTrack = fallbackStream.getVideoTracks()[0];
-      fallbackTrack.contentHint = 'detail';
+      applyContentHint(fallbackTrack);
       if (ctx.dxgiSender) {
         await ctx.dxgiSender.replaceTrack(fallbackTrack);
         window.nexuson.debugLog('[dxgi] getDisplayMedia yedegine gecis basarili (replaceTrack)');
@@ -1989,6 +2060,8 @@ function sendCaptureStatus(ctx, active, detail) {
 // allowControlCheckbox sadece renderer tarafi on-filtresidir.
 
 let consentResolver = null;
+let consentTimer = null;
+const CONSENT_TIMEOUT_MS = 120 * 1000; // musteri 2 dk icinde yanit vermezse istek dusurulur
 
 function askHostConsent(agentName) {
   return new Promise((resolve) => {
@@ -2001,11 +2074,18 @@ function askHostConsent(agentName) {
     els.consentControlCheckbox.disabled = true;
     els.consentAcceptBtn.disabled = true;
     els.consentOverlay.classList.remove('hidden');
-    els.consentDenyBtn.focus();
+    // Uygulama arka planda/kucukse onay penceresi gorunmuyor ve personel suresiz
+    // bekliyordu: pencereyi one getir (ekran yakalama henuz baslamadi, guvenli).
+    window.nexuson.requestAttention();
+    // Odak "Reddet"te olursa yanlislikla Enter reddettirir; onay kutusuna odaklan.
+    els.consentViewCheckbox.focus();
+    clearTimeout(consentTimer);
+    consentTimer = setTimeout(() => settleHostConsent('timeout'), CONSENT_TIMEOUT_MS);
   });
 }
 
 function settleHostConsent(decision) {
+  clearTimeout(consentTimer);
   els.consentOverlay.classList.add('hidden');
   const resolve = consentResolver;
   consentResolver = null;
@@ -2064,15 +2144,20 @@ async function hostConsentThenOffer(ctx, sessionId, peerName) {
   if (ctx.consentPending || ctx.consent) return; // ayni oturumda ikinci kez sorma
   ctx.consentPending = true;
   log(`${peerName || 'Destek personeli'} bağlanmak istiyor, onayınız bekleniyor...`);
+  // Personelin ekraninda "musteri onayi bekleniyor" gorunsun (sinyal sunucusu iletir).
+  if (ctx.ws && ctx.ws.readyState === 1) ctx.ws.send(JSON.stringify({ type: 'host-status', state: 'consent-pending' }));
   const decision = await askHostConsent(peerName);
   ctx.consentPending = false;
 
   // Onay beklenirken karsi taraf ayrildi / oturum kapandiysa devam etme.
   if (!ctx.ws || ctx.disconnecting) return;
 
-  if (decision === 'deny') {
+  if (decision === 'deny' || decision === 'timeout') {
     await window.nexuson.setControlConsent(false);
-    disconnectSession(ctx, sessionId, 'Bağlantı isteğini reddettiniz.');
+    if (ctx.ws && ctx.ws.readyState === 1) {
+      ctx.ws.send(JSON.stringify({ type: 'host-status', state: decision === 'timeout' ? 'consent-timeout' : 'consent-denied' }));
+    }
+    disconnectSession(ctx, sessionId, decision === 'timeout' ? 'Onay süresi doldu, bağlantı isteği düşürüldü.' : 'Bağlantı isteğini reddettiniz.');
     return;
   }
 
@@ -2158,9 +2243,7 @@ async function startHostOffer(ctx, sessionId) {
       sendCaptureStatus(ctx, 'fallback', `DXGI başlatılamadı: ${err.message}`);
     }
     ctx.localStream = stream;
-    stream.getVideoTracks().forEach((track) => {
-      track.contentHint = 'detail';
-    });
+    stream.getVideoTracks().forEach(applyContentHint);
     stream.getTracks().forEach((track) => {
       window.nexuson.debugLog(`[capture] track.getSettings(): ${JSON.stringify(track.getSettings())}`);
       const sender = pc.addTrack(track, stream);
@@ -2592,6 +2675,7 @@ function bindControlChannel(ctx, channel) {
       // Sadece destek personeli (viewer) tarafinda anlamli: musteri kontrole
       // izin vermediyse / izni geri aldiysa personel bunu gorur.
       if (state.role !== 'host') {
+        state.peerControlAllowed = evt.allowed;
         els.controlHint.textContent = evt.allowed
           ? 'Kontrol için ekrana tıklayın'
           : 'Yalnızca görüntüleme — müşteri kontrole izin vermedi';
@@ -2610,7 +2694,22 @@ function bindControlChannel(ctx, channel) {
       return;
     }
 
+    if (evt.type === 'capture-status' && evt.active === 'stalled') {
+      // Musteri tarafinda akis durdu ve otomatik kurtarma sonuc vermedi.
+      if (state.role !== 'host') {
+        log('Görüntü akışı durdu. Müşteriden NexusOn penceresini açmasını isteyin.');
+        els.controlHint.textContent = 'Görüntü akışı durdu — müşteriden NexusOn penceresini açmasını isteyin';
+      }
+      return;
+    }
+
     if (evt.type === 'capture-status') {
+      if (state.role !== 'host' && evt.detail && evt.detail.includes('yeniden başladı')) {
+        els.controlHint.textContent =
+          state.peerControlAllowed === false
+            ? 'Yalnızca görüntüleme — müşteri kontrole izin vermedi'
+            : 'Kontrol için ekrana tıklayın';
+      }
       // Destek personelinin KENDI ekranindan gorebilmesi icin: yakalama
       // yontemi (native DXGI / yedek getDisplayMedia) degistiginde, daha
       // once sadece musteri makinesinin dosya-tabanli log'unda goruleni
