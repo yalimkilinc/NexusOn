@@ -29,3 +29,6 @@ Thumbs.db
 # Claude Code oturum/tamamlama dosyaları
 .claude/completions/
 .claude/sessions/
+
+# test paketindeki kurulum dosyalari (buyuk ikili dosyalar)
+test-paketi/kurulum/
