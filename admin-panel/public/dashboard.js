@@ -537,7 +537,13 @@ function renderTicketTable(tickets) {
     cells[1].textContent = t.agent_username;
     cells[2].textContent = t.room_code;
     if (t.is_manual_customer) {
-      cells[3].innerHTML = `<span class="manual-badge" title="Personel müşteriyi V3'te bulamadı, manuel bağlandı">Manuel</span> ${customerLabel || ''}`;
+      // GUVENLIK: musteri adi/telefonu kimlik dogrulamasiz uctan gelebilir -
+      // innerHTML'e gomulmez (depolanmis XSS); rozet elle, metin textContent ile eklenir.
+      const badge = document.createElement('span');
+      badge.className = 'manual-badge';
+      badge.title = "Personel müşteriyi V3'te bulamadı, manuel bağlandı";
+      badge.textContent = 'Manuel';
+      cells[3].append(badge, ` ${customerLabel || ''}`);
     } else {
       cells[3].textContent = customerLabel || '—';
     }

@@ -50,7 +50,8 @@ const server = useTls
     })
   : http.createServer();
 
-const wss = new WebSocketServer({ server });
+// SDP/ICE mesajlari birkac KB'dir; varsayilan 100 MiB sinirini 256 KB'a indiriyoruz.
+const wss = new WebSocketServer({ server, maxPayload: 256 * 1024 });
 
 // roomCode -> Set<WebSocket>  (bir odada en fazla 2 katilimci: host + viewer)
 const rooms = new Map();
@@ -67,7 +68,8 @@ const rooms = new Map();
 // tahmin etmeyi pratikte imkansiz hale getiriyor (900 bin ihtimali, dakikada
 // birkac denemeyle, birkac dakikalik bir pencerede tuketmek matematiksel
 // olarak yapilamaz).
-const ROOM_TTL_MS = 15 * 60 * 1000; // oda, 2. kisi katilmadan 15 dk sonra kapanir
+const ROOM_TTL_MS = Number(process.env.ROOM_TTL_MS) || 15 * 60 * 1000; // oda, 2. kisi katilmadan 15 dk sonra kapanir
+const ROOM_SWEEP_MS = Number(process.env.ROOM_SWEEP_MS) || 60 * 1000;
 const roomCreatedAt = new Map(); // roomCode -> olusturulma zamani (ms)
 
 // ONEMLI (CANLI KANITLANDI - gercek destek ekibi testinde): host ve viewer
@@ -84,6 +86,38 @@ const roomCreatedAt = new Map(); // roomCode -> olusturulma zamani (ms)
 const JOIN_RATE_WINDOW_MS = 2 * 60 * 1000;
 const JOIN_RATE_MAX = 60; // IP basina 2 dakikada en fazla 60 'join' denemesi
 const joinAttempts = new Map(); // ip -> { count, windowStart }
+
+// Gercek istemci IP'si: uygulama Caddy arkasinda calistigi icin baglanti hep
+// 127.0.0.1'den gelir; bu durumda Caddy'nin eklediği X-Forwarded-For'un SON
+// elemani (Caddy'nin gordugu gercek IP) kullanilir. Aksi halde tum kullanicilar
+// tek bir "IP" sayilir ve tek bir kotayi paylasir.
+function clientIpOf(req) {
+  const remote = req.socket.remoteAddress || 'bilinmeyen';
+  const isLoopback = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
+  if (isLoopback) {
+    const xff = String(req.headers['x-forwarded-for'] || '');
+    const last = xff.split(',').pop().trim();
+    if (last) return last;
+  }
+  return remote;
+}
+
+// "Oda bulunamadi" donen katilimlar (kod tahmininin belirtisi) icin ayri, daha
+// dusuk sayac: normal kullanicinin dakikalar icinde 20'den fazla yanlis kod
+// denemesi beklenmez.
+const NOT_FOUND_WINDOW_MS = 2 * 60 * 1000;
+const NOT_FOUND_MAX = 20;
+const notFoundAttempts = new Map(); // ip -> { count, windowStart }
+function countNotFound(ip) {
+  const now = Date.now();
+  let entry = notFoundAttempts.get(ip);
+  if (!entry || now - entry.windowStart > NOT_FOUND_WINDOW_MS) {
+    entry = { count: 0, windowStart: now };
+    notFoundAttempts.set(ip, entry);
+  }
+  entry.count++;
+  return entry.count > NOT_FOUND_MAX;
+}
 
 function isRateLimited(ip) {
   const now = Date.now();
@@ -103,6 +137,9 @@ setInterval(() => {
   for (const [ip, entry] of joinAttempts) {
     if (now - entry.windowStart > JOIN_RATE_WINDOW_MS) joinAttempts.delete(ip);
   }
+  for (const [ip, entry] of notFoundAttempts) {
+    if (now - entry.windowStart > NOT_FOUND_WINDOW_MS) notFoundAttempts.delete(ip);
+  }
   for (const [roomCode, createdAt] of roomCreatedAt) {
     if (now - createdAt > ROOM_TTL_MS) {
       const room = rooms.get(roomCode);
@@ -116,7 +153,7 @@ setInterval(() => {
       roomCreatedAt.delete(roomCode);
     }
   }
-}, 60 * 1000).unref();
+}, ROOM_SWEEP_MS).unref();
 
 function send(ws, data) {
   if (ws.readyState === ws.OPEN) {
@@ -139,7 +176,7 @@ wss.on('error', (err) => {
 wss.on('connection', (ws, req) => {
   ws.roomCode = null;
   ws.role = null;
-  ws.clientIp = req.socket.remoteAddress || 'bilinmeyen';
+  ws.clientIp = clientIpOf(req);
 
   // Yakalanmamis bir 'error' olayi bu soketi (EventEmitter) firlatip TUM
   // sureci cokertebilir - bu da o an baglantili butun oda/oturumlari
@@ -163,6 +200,11 @@ wss.on('connection', (ws, req) => {
         return;
       }
 
+      if (ws.roomCode) {
+        send(ws, { type: 'error', message: 'Bu baglanti zaten bir odaya katildi.' });
+        return;
+      }
+
       const roomCode = String(msg.roomCode || '').trim();
       const role = msg.role === 'host' ? 'host' : 'viewer';
       if (!roomCode) {
@@ -176,6 +218,10 @@ wss.on('connection', (ws, req) => {
         // odaya katilip onu yaratmasi, saldirganin oda kodlarini onceden isgal
         // etmesine izin veriyordu.
         if (role !== 'host') {
+          if (countNotFound(ws.clientIp)) {
+            send(ws, { type: 'error', message: 'Cok fazla hatali kod denendi. Lutfen biraz sonra tekrar deneyin.' });
+            return;
+          }
           send(ws, { type: 'error', message: 'Oda bulunamadi. Musteriden guncel kodu isteyin.' });
           return;
         }
@@ -204,6 +250,10 @@ wss.on('connection', (ws, req) => {
       // kimlik degil); kontrol karakterleri temizlenir, uzunluk sinirlanir.
       ws.displayName = String(msg.name || '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 60);
       room.add(ws);
+      // Iki taraf da odaya girdi: oda artik 'bekleyen' degil, aktif oturum. 15 dk
+      // suresi yalnizca ikinci kisi hic katilmayan odalar icindir; aktif oturumu
+      // kesmemeli.
+      if (room.size >= 2) roomCreatedAt.delete(roomCode);
 
       broadcastToRoom(ws, { type: 'peer-joined', role, name: ws.displayName });
       const otherPeer = [...room].find((p) => p !== ws);
@@ -219,6 +269,12 @@ wss.on('connection', (ws, req) => {
 
     // SDP teklif/cevap ve ICE adaylarini oldugu gibi karsi tarafa ilet
     if (msg.type === 'offer' || msg.type === 'answer' || msg.type === 'ice-candidate') {
+      if (!ws.roomCode) return; // odaya katilmamis soket hicbir sey iletemez
+      // Roller: offer'i yalnizca host, answer'i yalnizca viewer uretir. Aksi halde
+      // musteri onay vermeden once viewer'in 'offer'i host'a ulasip baglanti/IP
+      // bilgisi onay beklenmeden kurulabiliyordu.
+      if (msg.type === 'offer' && ws.role !== 'host') return;
+      if (msg.type === 'answer' && ws.role !== 'viewer') return;
       broadcastToRoom(ws, msg);
       return;
     }
@@ -233,6 +289,9 @@ wss.on('connection', (ws, req) => {
     if (room.size === 0) {
       rooms.delete(ws.roomCode);
       roomCreatedAt.delete(ws.roomCode);
+    } else if (room.size === 1) {
+      // Yalniz kalan taraf icin oda yeniden 'bekleyen' olur; TTL yeniden baslar.
+      roomCreatedAt.set(ws.roomCode, Date.now());
     }
   });
 });
