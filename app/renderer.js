@@ -3119,5 +3119,8 @@ function updateTransferStatus(transferId, text, rejected, filePath) {
   }
 }
 
-setRole('host');
+// Personel kurulumu (dist:staff) doğrudan personel girişiyle açılır; müşteri
+// kurulumu her zaman müşteri (host) ekranıyla açılır. Personel isterse üstteki
+// "Destek Almak İçin" sekmesine geçebilir.
+setRole(IS_STAFF_BUILD ? 'viewer' : 'host');
 log('NexusOn hazır. Bir rol seçip bağlanabilirsiniz.');
