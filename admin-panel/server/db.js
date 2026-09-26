@@ -225,4 +225,19 @@ if (newsCount === 0) {
   insert.run('Destek ekibimiz hafta içi 09:00–18:00 arası hizmet vermektedir.', 1);
 }
 
+// Musteri sifre sifirlama kodlari (bkz. routes/customerAuth.js). Kod DUZ
+// METIN saklanmaz (tuzlu ozet), tek kullanimlik, sureli ve deneme sinirli.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS customer_password_resets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    telefon TEXT NOT NULL,
+    code_hash TEXT NOT NULL,
+    salt TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    used INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL
+  );
+`);
+
 module.exports = db;

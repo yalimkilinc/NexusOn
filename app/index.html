@@ -321,6 +321,49 @@
           <button id="crLoginSubmitBtn" class="primary-btn">Giriş Yap</button>
           <button id="crCancelBtn2" class="secondary-btn" type="button">Vazgeç</button>
         </div>
+        <button id="crForgotLinkBtn" class="link-btn" type="button">Şifremi unuttum</button>
+      </div>
+
+      <!-- Sifremi unuttum, adim 1: kayitli telefon + vergi numarasi ile talep.
+           SMS altyapisi yok: kod destek ekibine (Telegram) duser, destek musteriyi
+           KAYITLI numarasindan geri arayip dogrular ve kodu iletir. -->
+      <div id="crForgotStep" class="hidden">
+        <p class="hint" style="margin-bottom:10px;">Şifre sıfırlama isteği oluşturun. Destek ekibimiz sizi kayıtlı numaranızdan arayıp doğrulama kodunu iletecek.</p>
+        <div class="field-row">
+          <label>Telefon Numarası</label>
+          <input id="crForgotPhoneLabel" disabled />
+        </div>
+        <div class="field-row">
+          <label>Vergi Numarası</label>
+          <input id="crForgotTaxInput" inputmode="numeric" autocomplete="off" />
+        </div>
+        <p id="crForgotError" class="error-text hidden"></p>
+        <div style="display:flex; gap:10px;">
+          <button id="crForgotSubmitBtn" class="primary-btn">Sıfırlama İste</button>
+          <button id="crForgotBackBtn" class="secondary-btn" type="button">Geri</button>
+        </div>
+      </div>
+
+      <!-- Sifremi unuttum, adim 2: destek ekibinden alinan kod + yeni sifre -->
+      <div id="crResetStep" class="hidden">
+        <p class="hint" style="margin-bottom:10px;">Talebiniz destek ekibine iletildi. Sizi kayıtlı numaranızdan arayıp 6 haneli kodu verecekler (30 dakika geçerli). Kodu ve yeni şifrenizi girin.</p>
+        <div class="field-row">
+          <label>Doğrulama Kodu</label>
+          <input id="crResetCodeInput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" />
+        </div>
+        <div class="field-row">
+          <label>Yeni Şifre</label>
+          <input id="crResetPasswordInput" type="password" autocomplete="new-password" />
+        </div>
+        <div class="field-row">
+          <label>Yeni Şifre (tekrar)</label>
+          <input id="crResetPassword2Input" type="password" autocomplete="new-password" />
+        </div>
+        <p id="crResetError" class="error-text hidden"></p>
+        <div style="display:flex; gap:10px;">
+          <button id="crResetSubmitBtn" class="primary-btn">Şifreyi Değiştir</button>
+          <button id="crResetBackBtn" class="secondary-btn" type="button">Vazgeç</button>
+        </div>
       </div>
 
       <!-- Adim 2b: yeni musteri kaydi -->

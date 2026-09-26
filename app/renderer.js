@@ -216,6 +216,20 @@ const els = {
   crRegisterError: document.getElementById('crRegisterError'),
   crRegisterSubmitBtn: document.getElementById('crRegisterSubmitBtn'),
   crCancelBtn3: document.getElementById('crCancelBtn3'),
+  crForgotLinkBtn: document.getElementById('crForgotLinkBtn'),
+  crForgotStep: document.getElementById('crForgotStep'),
+  crForgotPhoneLabel: document.getElementById('crForgotPhoneLabel'),
+  crForgotTaxInput: document.getElementById('crForgotTaxInput'),
+  crForgotError: document.getElementById('crForgotError'),
+  crForgotSubmitBtn: document.getElementById('crForgotSubmitBtn'),
+  crForgotBackBtn: document.getElementById('crForgotBackBtn'),
+  crResetStep: document.getElementById('crResetStep'),
+  crResetCodeInput: document.getElementById('crResetCodeInput'),
+  crResetPasswordInput: document.getElementById('crResetPasswordInput'),
+  crResetPassword2Input: document.getElementById('crResetPassword2Input'),
+  crResetError: document.getElementById('crResetError'),
+  crResetSubmitBtn: document.getElementById('crResetSubmitBtn'),
+  crResetBackBtn: document.getElementById('crResetBackBtn'),
   aboutOverlay: document.getElementById('aboutOverlay'),
   aboutVersionText: document.getElementById('aboutVersionText'),
   aboutSecurityLinkBtn: document.getElementById('aboutSecurityLinkBtn'),
@@ -877,6 +891,8 @@ function showCrStep(step) {
   els.crPhoneStep.classList.toggle('hidden', step !== 'phone');
   els.crLoginStep.classList.toggle('hidden', step !== 'login');
   els.crRegisterStep.classList.toggle('hidden', step !== 'register');
+  els.crForgotStep.classList.toggle('hidden', step !== 'forgot');
+  els.crResetStep.classList.toggle('hidden', step !== 'reset');
 }
 
 els.connectionRequestBtn.addEventListener('click', () => {
@@ -889,6 +905,12 @@ els.connectionRequestBtn.addEventListener('click', () => {
   els.crRegisterPasswordInput.value = '';
   els.crKvkkCheckbox.checked = false;
   els.crRegisterError.classList.add('hidden');
+  els.crForgotTaxInput.value = '';
+  els.crForgotError.classList.add('hidden');
+  els.crResetCodeInput.value = '';
+  els.crResetPasswordInput.value = '';
+  els.crResetPassword2Input.value = '';
+  els.crResetError.classList.add('hidden');
   showCrStep('phone');
   els.connectionRequestOverlay.classList.remove('hidden');
   els.crPhoneInput.focus();
@@ -1017,6 +1039,109 @@ async function submitCrLogin() {
   }
 }
 els.crLoginSubmitBtn.addEventListener('click', submitCrLogin);
+
+// --------------------------- Sifremi unuttum ---------------------------
+
+function showCrError(el, message) {
+  el.textContent = message;
+  el.classList.remove('hidden');
+}
+function crNetworkMessage(err) {
+  return err.message.includes('fetch') ? 'Sunucuya ulaşılamadı. İnternet/ağ bağlantınızı kontrol edin.' : err.message;
+}
+
+els.crForgotLinkBtn.addEventListener('click', () => {
+  els.crForgotPhoneLabel.value = els.crPhoneInput.value.trim();
+  els.crForgotTaxInput.value = '';
+  els.crForgotError.classList.add('hidden');
+  showCrStep('forgot');
+  els.crForgotTaxInput.focus();
+});
+els.crForgotBackBtn.addEventListener('click', () => {
+  showCrStep('login');
+  els.crLoginPasswordInput.focus();
+});
+
+async function submitCrForgot() {
+  const telefon = els.crPhoneInput.value.trim();
+  const vergiNo = els.crForgotTaxInput.value.trim();
+  if (!vergiNo) {
+    showCrError(els.crForgotError, 'Lütfen firmanızın vergi numarasını girin.');
+    return;
+  }
+  els.crForgotError.classList.add('hidden');
+  els.crForgotSubmitBtn.disabled = true;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/public/customer/forgot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefon, vergiNo }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'İstek iletilemedi.');
+    els.crResetCodeInput.value = '';
+    els.crResetPasswordInput.value = '';
+    els.crResetPassword2Input.value = '';
+    els.crResetError.classList.add('hidden');
+    showCrStep('reset');
+    els.crResetCodeInput.focus();
+  } catch (err) {
+    showCrError(els.crForgotError, crNetworkMessage(err));
+  } finally {
+    els.crForgotSubmitBtn.disabled = false;
+  }
+}
+els.crForgotSubmitBtn.addEventListener('click', submitCrForgot);
+els.crForgotTaxInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitCrForgot();
+});
+
+els.crResetBackBtn.addEventListener('click', () => {
+  showCrStep('login');
+  els.crLoginPasswordInput.focus();
+});
+
+async function submitCrReset() {
+  const telefon = els.crPhoneInput.value.trim();
+  const kod = els.crResetCodeInput.value.replace(/\D/g, '');
+  const yeniSifre = els.crResetPasswordInput.value;
+  if (kod.length !== 6) {
+    showCrError(els.crResetError, 'Lütfen 6 haneli doğrulama kodunu girin.');
+    return;
+  }
+  if (yeniSifre.length < 6) {
+    showCrError(els.crResetError, 'Şifre en az 6 karakter olmalı.');
+    return;
+  }
+  if (yeniSifre !== els.crResetPassword2Input.value) {
+    showCrError(els.crResetError, 'Şifreler aynı değil.');
+    return;
+  }
+  els.crResetError.classList.add('hidden');
+  els.crResetSubmitBtn.disabled = true;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/public/customer/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefon, kod, yeniSifre }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Şifre değiştirilemedi.');
+    els.crLoginPhoneLabel.textContent = `Telefon: ${telefon} — Şifreniz değiştirildi. Yeni şifrenizle giriş yapın.`;
+    els.crLoginPasswordInput.value = '';
+    els.crLoginError.classList.add('hidden');
+    showCrStep('login');
+    els.crLoginPasswordInput.focus();
+  } catch (err) {
+    showCrError(els.crResetError, crNetworkMessage(err));
+  } finally {
+    els.crResetSubmitBtn.disabled = false;
+  }
+}
+els.crResetSubmitBtn.addEventListener('click', submitCrReset);
+els.crResetPassword2Input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitCrReset();
+});
 els.crLoginPasswordInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') submitCrLogin();
 });
