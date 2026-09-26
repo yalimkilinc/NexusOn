@@ -40,15 +40,33 @@ if (sniMapPath && fs.existsSync(sniMapPath)) {
   }
 }
 
+// Duz HTTP istekleri (tarayici, izleme araclari): sunucu yalnizca WebSocket
+// konusuyordu ve bu isteklere HIC yanit vermiyordu (istemci vazgecene kadar
+// asili kaliyordu). Artik '/' ve '/health' "calisiyor" der, digerleri 404.
+// WebSocket yukseltmeleri ('upgrade' olayi) bundan etkilenmez.
+function httpHandler(req, res) {
+  const urlPath = (req.url || '').split('?')[0];
+  if ((urlPath === '/' || urlPath === '/health') && (req.method === 'GET' || req.method === 'HEAD')) {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(req.method === 'HEAD' ? undefined : 'NexusOn sinyal sunucusu calisiyor\n');
+    return;
+  }
+  res.writeHead(404, { 'Cache-Control': 'no-store' });
+  res.end();
+}
+
 const server = useTls
-  ? https.createServer({
-      cert: fs.readFileSync(certPath),
-      key: fs.readFileSync(keyPath),
-      ...(sniContexts && {
-        SNICallback: (servername, cb) => cb(null, sniContexts.get(servername)),
-      }),
-    })
-  : http.createServer();
+  ? https.createServer(
+      {
+        cert: fs.readFileSync(certPath),
+        key: fs.readFileSync(keyPath),
+        ...(sniContexts && {
+          SNICallback: (servername, cb) => cb(null, sniContexts.get(servername)),
+        }),
+      },
+      httpHandler
+    )
+  : http.createServer(httpHandler);
 
 // SDP/ICE mesajlari birkac KB'dir; varsayilan 100 MiB sinirini 256 KB'a indiriyoruz.
 const wss = new WebSocketServer({ server, maxPayload: 256 * 1024 });
